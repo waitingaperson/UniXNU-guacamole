@@ -1,0 +1,47 @@
+# Device overrides for the UniXNU kernel build.
+# The target userland is the iPhone X iOS 16.7.16 image, so the kernel source
+# is the last matching open-source tag rather than UniXNU's iOS 17 baseline.
+
+[[source]]
+name = "xnu"
+kind = "refer"
+git = "https://github.com/apple-oss-distributions/xnu.git"
+ref = "xnu-8796.141.3"
+commit = "1b191cb58250d0705d8a51287127505aa4bc0789"
+darwin = "22.6.0"
+version = "8796.141.3"
+driverkit_tag = "xnu-8796.141.3"
+trustcache_tag = "xnu-8796.101.5"
+
+[[source]]
+name = "libplatform"
+kind = "refer"
+git = "https://github.com/apple-oss-distributions/libplatform.git"
+ref = "libplatform-316.100.10"
+commit = "a00a4cc36da2110578bcf3b8eeeeb93dcc7f4e11"
+
+[[source]]
+name = "libdispatch"
+kind = "refer"
+git = "https://github.com/apple-oss-distributions/libdispatch.git"
+ref = "libdispatch-1477.100.9"
+commit = "30fe6a7d945340ce69cef121132f049e810089a5"
+
+[[source]]
+name = "AvailabilityVersions"
+kind = "refer"
+git = "https://github.com/apple-oss-distributions/AvailabilityVersions.git"
+ref = "AvailabilityVersions-141.1"
+commit = "933f9360f1b70dfbda5548386a3d65e0358b4f7d"
+
+[[source]]
+name = "libpthread"
+kind = "refer"
+git = "https://github.com/apple-oss-distributions/libpthread.git"
+ref = "libpthread-514.100.2"
+
+[[source]]
+name = "corecrypto-2023"
+kind = "refer"
+git = "https://github.com/ONLYA/corecrypto-2023.git"
+commit = "11fba65b12d8830630e248dfa8344caf8b065f26"

@@ -1,0 +1,50 @@
+name: kernel-8796
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: UniXNU/UniXNU
+          ref: b6ae99c17194e6a18fd819d3148e69fe405e91fc
+          path: unixnu
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install host tools
+        run: |
+          brew install cmake ninja unifdef llvm
+          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+
+      - name: Select the device
+        run: ./unixnu/unixnu defconfig guacamole_8796_defconfig -D .
+
+      - name: Fetch kernel sources
+        run: ./unixnu/unixnu fetch xnu libplatform libdispatch AvailabilityVersions libpthread corecrypto-2023 -D .
+
+      - name: Build kernel
+        run: ./unixnu/unixnu build kernel -D . || true
+
+      - name: Upload build output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-8796
+          path: |
+            unixnu/out/guacamole/tree/build/xnu/**
+            unixnu/out/guacamole/logs/**
+            unixnu.lock
+          if-no-files-found: warn

@@ -296,6 +296,13 @@
   not `extern "C"`. r52 fixes both; it is the pending image for the next
   hardware test.
 
+- r52 also failed (`extern "C"` is not allowed inside a function); r53 moves
+  the declaration to file scope in `IOPlatformExpert.cpp` and builds
+  cleanly. Image `out/guacamole/boot/boot-32-r53.img`, sha256
+  `73f6f338...`, kernel `0b505b11...`, payload `1cf029c1...`. This is the
+  next hardware test: the digit should show 111/112/113/114/115 and name
+  the `configureDefaults` step.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

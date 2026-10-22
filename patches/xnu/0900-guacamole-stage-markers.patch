@@ -1,0 +1,119 @@
+--- a/osfmk/arm/arm_init.c	2026-10-22 11:16:12.029770932 +0800
++++ b/osfmk/arm/arm_init.c	2026-10-22 11:15:38.050923720 +0800
+@@ -197,5 +197,6 @@
+ #define dyldLogFunc(msg, ...)
+ #include <mach/dyld_kernel_fixups.h>
+ 
++extern void sweet_stage_mark(boot_args *args, unsigned int stage);
+ extern uint32_t __thread_starts_sect_start[] __asm("section$start$__TEXT$__thread_starts");
+ extern uint32_t __thread_starts_sect_end[]   __asm("section$end$__TEXT$__thread_starts");
+@@ -347,6 +348,7 @@
+ 	DTEntry chosen = NULL;
+ 	unsigned int dt_entry_size = 0;
+ 
++	sweet_stage_mark(args, 0);
+ 	arm_setup_pre_sign();
+ 
+ 	arm_slide_rebase_and_sign_image();
+@@ -363,6 +365,7 @@
+ #endif /* defined(HAS_APPLE_PAC) */
+ 
+ 	PE_init_platform(FALSE, args); /* Get platform expert set up */
++	sweet_stage_mark(args, 1);
+ 
+ #if __arm64__
+ 	configure_timer_apple_regs();
+@@ -434,6 +437,7 @@
+ #endif
+ 
+ 	ml_parse_cpu_topology();
++	sweet_stage_mark(args, 2);
+ 
+ 
+ 	master_cpu = ml_get_boot_cpu_number();
+@@ -464,11 +468,13 @@
+ 	 */
+ 	thread->machine.preemption_count = 0;
+ 	cpu_bootstrap();
++	sweet_stage_mark(args, 3);
+ 
+ 	rtclock_early_init();
+ 
+ 	kernel_debug_string_early("kernel_startup_bootstrap");
+ 	kernel_startup_bootstrap();
++	sweet_stage_mark(args, 4);
+ 
+ 	/*
+ 	 * Initialize the timer callout world
+@@ -476,8 +482,10 @@
+ 	timer_call_init();
+ 
+ 	cpu_init();
++	sweet_stage_mark(args, 5);
+ 
+ 	processor_bootstrap();
++	sweet_stage_mark(args, 6);
+ 
+ 	if (PE_parse_boot_argn("maxmem", &maxmem, sizeof(maxmem))) {
+ 		xmaxmem = (uint64_t) maxmem * (1024 * 1024);
+@@ -524,6 +532,7 @@
+ 	__builtin_arm_wsr("pan", 1);
+ #endif  /* __ARM_PAN_AVAILABLE__ */
+ 
++	sweet_stage_mark(args, 7);
+ 	arm_vm_init(xmaxmem, args);
+ 
+ 	if (debug_boot_arg) {
+--- a/osfmk/conf/files.arm64	2026-10-22 11:16:12.029770932 +0800
++++ b/osfmk/conf/files.arm64	2026-10-22 11:15:42.457222027 +0800
+@@ -39,6 +39,7 @@
+ osfmk/arm/cpuid.c   standard
+ osfmk/arm/data.s	standard
+ osfmk/arm64/dbgwrap.c		standard
++osfmk/arm64/sweet_stage.c	standard
+ osfmk/arm/arm_timer.c		standard
+ osfmk/arm/arm_init.c	optional config_pmap_ppl
+ osfmk/arm64/arm_vm_init.c	optional config_pmap_ppl
+diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
+new file mode 100644
+index 0000000..6c6b5af
+--- /dev/null
++++ b/osfmk/arm64/sweet_stage.c
+@@ -0,0 +1,37 @@
++/*
++ * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
++ * of the boot framebuffer V=P, so these writes work from C with the MMU on
++ * and without any IOKit driver. Each stage is a 128x16 block at x=300,
++ * y=340+stage*20; stage 0 is the C entry and stage 7 is immediately before
++ * arm_vm_init tears down the bootstrap TTBR0.
++ */
++#include <pexpert/pexpert.h>
++#include <pexpert/arm64/boot.h>
++#include <stdint.h>
++
++void
++sweet_stage_mark(boot_args *args, unsigned int stage)
++{
++	static const uint32_t colors[8] = {
++		0xffff0000u, 0xff00ff00u, 0xff0000ffu, 0xffffff00u,
++		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu
++	};
++
++	if (args == NULL || stage > 7) {
++		return;
++	}
++	uint64_t base = args->Video.v_baseAddr;
++	uint32_t stride = (uint32_t)args->Video.v_rowBytes;
++	if (base == 0 || stride < 4) {
++		return;
++	}
++	volatile uint32_t *fb = (volatile uint32_t *)(uintptr_t)base;
++	uint32_t y = 340u + stage * 20u;
++	for (uint32_t row = 0; row < 16; row++) {
++		volatile uint32_t *line = fb + (uint64_t)(y + row) * (stride / 4u);
++		for (uint32_t col = 300; col < 428; col++) {
++			line[col] = colors[stage];
++		}
++	}
++	__asm__ volatile ("dsb sy" ::: "memory");
++}

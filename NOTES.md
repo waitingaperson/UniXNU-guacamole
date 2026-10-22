@@ -75,9 +75,19 @@
   SM8150 reference; either port it to the 4K kernel or extend NativeUfs with
   guacamole's GCC/UFS/SMMU addresses. The display side has the same issue:
   sheng's Legacy display builder is A740/sheng-specific.
+- **r16 4 KiB boot failed.** `boot-32-r16.img` (72,302,592 bytes, sha256
+  `c875f989...`) contains the 4 KiB kernel (`ea6cd866...`) with UFS and the
+  built-in AppleCLCD/SweetSurface framebuffer, prelinked to
+  `7b133ea8...` (53,202,944 bytes). After `fastboot boot`, the fastboot
+  device disappeared at 10:04:10 and a `05c6:900e QUSB_BULK_SN` Qualcomm
+  device appeared at 10:04:34; no UEFI gadget or display output was seen.
+  The phone had to be recovered manually. This is an early crash/reset, not
+  a UFS/HFS result. The next test must add an early framebuffer/panic
+  console (or boot a minimal 4K kernel without UFS/framebuffer) to separate
+  kernel entry/prelink from the new drivers.
 - The previous 16 KiB r15 chain remains the known-good boot path. The 4 KiB
-  kernel is built and prelinked, but not yet booted; storage and display are
-  the next porting blockers.
+  kernel is built and prelinked; storage and display compiled, but the first
+  boot attempt did not reach a visible stage.
 
 ## 2026-10-21: project split
 

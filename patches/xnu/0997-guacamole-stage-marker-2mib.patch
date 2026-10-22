@@ -1,11 +1,13 @@
 diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 --- a/osfmk/arm64/sweet_stage.c
 +++ b/osfmk/arm64/sweet_stage.c
-@@ -2,7 +2,7 @@
+@@ -1,8 +1,8 @@
+ /*
   * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
   * of the boot framebuffer V=P, so these writes work from C with the MMU on
-  * and without any IOKit driver. Each stage is a 128x4 block at x=300,
+- * and without any IOKit driver. Each stage is a 128x16 block at x=300,
 - * y=340+stage*20; stage 0 is the C entry and stage 7 is immediately before
++ * and without any IOKit driver. Each stage is a 128x4 block at x=300,
 + * y=40+stage*20; stage 0 is the C entry and stage 7 is immediately before
   * arm_vm_init tears down the bootstrap TTBR0.
   */

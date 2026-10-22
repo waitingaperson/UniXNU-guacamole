@@ -897,7 +897,7 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  void
  IOPlatformExpertDevice::configureDefaults( void )
  {
-+	extern void sweet_stage_mark(boot_args *args, unsigned int stage);
++	extern "C" void sweet_stage_mark(boot_args *args, unsigned int stage);
 +	sweet_stage_mark(NULL, 110);
  	createNVRAM();
 +	sweet_stage_mark(NULL, 111);
@@ -916,7 +916,7 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  void
  IOPlatformExpertDevice::createNVRAM( void )
  {
-+	extern void sweet_stage_mark(boot_args *args, unsigned int stage);
++	extern "C" void sweet_stage_mark(boot_args *args, unsigned int stage);
  	/*
  	 * Publish an IODTNVRAM class on /options, if present.
  	 * DT-based platforms may need NVRAM access prior to the start

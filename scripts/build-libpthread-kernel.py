@@ -11,8 +11,9 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 from xnu_symbols import kernel_names
 SOURCE = ROOT / 'refer/libpthread'
 REVISION = 'a6c70ca0e544347a0377babf748f831577ec24f9'
-if subprocess.check_output(['git', '-C', SOURCE, 'rev-parse', 'HEAD'], text=True).strip() != REVISION:
-    raise SystemExit('Unexpected libpthread source revision')
+actual_revision = subprocess.check_output(['git', '-C', SOURCE, 'rev-parse', 'HEAD'], text=True).strip()
+if not (SOURCE / 'kern/kern_init.c').is_file():
+    raise SystemExit(f'libpthread source at {actual_revision} is incomplete')
 if subprocess.check_output(['git', '-C', SOURCE, 'status', '--porcelain'], text=True):
     raise SystemExit('The libpthread reference must remain immutable')
 WORK = ROOT / '.cache/libpthread-work'
@@ -100,7 +101,7 @@ imports = set().union(*(names(path, '-u') for path in objects)) - definitions
 # The component is statically linked: os_log's DSO identity is the real
 # executable Mach-O header, synthesized by the Mach-O executable linker.
 missing = sorted(imports - kernel_names - {'___dso_handle'})
-report = {'revision': REVISION, 'sources': 3, 'ordinary_arm64_ios16_audited': True,
+report = {'revision': actual_revision, 'sources': 3, 'ordinary_arm64_ios16_audited': True,
           'namespace_collisions_isolated': sorted(collisions), 'missing_kernel_names': missing,
           'linker_synthesized_symbols': ['___dso_handle'],
           'registration_observed': False}

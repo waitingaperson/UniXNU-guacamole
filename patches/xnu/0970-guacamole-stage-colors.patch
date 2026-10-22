@@ -1,0 +1,14 @@
+--- a/osfmk/arm64/sweet_stage.c	2026-10-22 11:53:39.551055373 +0800
++++ b/osfmk/arm64/sweet_stage.c	2026-10-22 11:53:39.567221536 +0800
+@@ -13,9 +13,9 @@
+ sweet_stage_mark(boot_args *args, unsigned int stage)
+ {
+ 	static const uint32_t colors[16] = {
+-		0xffff0000u, 0xff00ff00u, 0xff0000ffu, 0xffffff00u,
++		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
+ 		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
+-		0xffff8000u, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
++		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
+ 		0xffff0080u, 0xff80ff00u, 0xff4080c0u, 0xffc08040u
+ 	};
+ 

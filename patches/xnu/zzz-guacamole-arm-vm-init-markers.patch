@@ -14,12 +14,12 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
   * arm_vm_init tears down the bootstrap TTBR0.
   */
  #include <pexpert/pexpert.h>
-@@ -12,14 +14,19 @@
+@@ -12,14 +14,21 @@
  void
  sweet_stage_mark(boot_args *args, unsigned int stage)
  {
 -	static const uint32_t colors[16] = {
-+	static const uint32_t colors[36] = {
++	static const uint32_t colors[44] = {
  		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
  		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
  		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
@@ -29,15 +29,17 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +		0xff00ff40u, 0xffff40ffu, 0xff40ffffu, 0xffffff80u,
 +		0xffff0000u, 0xffff8000u, 0xffffff40u, 0xffff00ffu,
 +		0xff00ff80u, 0xff8000ffu, 0xffff0080u, 0xff80ff80u,
-+		0xff8080ffu, 0xffff8080u, 0xff80ffffu, 0xffffff80u
++		0xff8080ffu, 0xffff8080u, 0xff80ffffu, 0xffffff80u,
++		0xff20ff80u, 0xffff2080u, 0xff80ff20u, 0xff2080ffu,
++		0xffff8020u, 0xff20ffffu, 0xffff20ffu, 0xff80ffffu
  	};
  
 -	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 35) {
++	if (args == NULL || stage > 43) {
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,14 +38,17 @@
+@@ -31,14 +40,17 @@
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
@@ -316,3 +318,48 @@ diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
  
  #if __arm64__
  #if DEBUG
+@@ -603,8 +610,10 @@
+ #endif
+ 
+ 	cpu_machine_idle_init(TRUE);
++	sweet_stage_mark(args, 34);
+ 
+ 	PE_init_platform(TRUE, &BootCpuData);
++	sweet_stage_mark(args, 35);
+ 
+ #if __arm64__
+ 	extern bool cpu_config_correct;
+@@ -613,6 +622,7 @@
+ 	}
+ 
+ 	ml_map_cpu_pio();
++	sweet_stage_mark(args, 36);
+ 
+ #if APPLE_ARM64_ARCH_FAMILY
+ 	configure_late_apple_regs();
+@@ -621,6 +631,7 @@
+ #endif
+ 
+ 	cpu_timebase_init(TRUE);
++	sweet_stage_mark(args, 37);
+ 
+ #if KPERF
+ 	/* kptimer_curcpu_up() must be called after cpu_timebase_init */
+@@ -628,7 +639,9 @@
+ #endif /* KPERF */
+ 
+ 	PE_init_cpu();
++	sweet_stage_mark(args, 38);
+ 	fiq_context_init(TRUE);
++	sweet_stage_mark(args, 39);
+ 
+ 
+ #if HIBERNATION
+@@ -654,6 +667,7 @@
+ 	if (SecureDTGetProperty(chosen, "dram-size", (void const **)&dram_size, &dt_entry_size) != kSuccess) {
+ 		panic("%s: Unable to find 'dram-size' entry in the 'chosen' DT node", __FUNCTION__);
+ 	}
++	sweet_stage_mark(args, 40);
+ 
+ 	gDramBase = *dram_base;
+ 	gDramSize = *dram_size;

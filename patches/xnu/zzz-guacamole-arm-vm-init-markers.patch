@@ -981,3 +981,13 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  #else /* !defined(__x86_64__) */
  	OSData * data;
  
+diff --git a/osfmk/prng/prng_random.c b/osfmk/prng/prng_random.c
+--- a/osfmk/prng/prng_random.c
++++ b/osfmk/prng/prng_random.c
+@@ -450,5 +450,5 @@
+ 		panic("source corecrypto initialization failed: %d", source_corecrypto14_status);
+ 	}
+ }
+-STARTUP(EARLY_BOOT, STARTUP_RANK_FIRST, source_corecrypto14_bootstrap);
++STARTUP(SYSCTL, STARTUP_RANK_LAST, source_corecrypto14_bootstrap);
+ #endif

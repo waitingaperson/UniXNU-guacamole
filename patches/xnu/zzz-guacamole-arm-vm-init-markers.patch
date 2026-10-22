@@ -904,7 +904,7 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  	// Parse the serial-number data and publish a user-readable string
  	OSData* mydata = (OSData*) (getProperty("serial-number"));
  	if (mydata != NULL) {
-@@ -2140,7 +2143,9 @@
+@@ -2140,12 +2143,15 @@
  			serNoString->release();
  		}
  	}
@@ -914,7 +914,13 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  }
  
  void
-@@ -2156,6 +2161,7 @@
+ IOPlatformExpertDevice::createNVRAM( void )
+ {
++	extern void sweet_stage_mark(boot_args *args, unsigned int stage);
+ 	/*
+ 	 * Publish an IODTNVRAM class on /options, if present.
+ 	 * DT-based platforms may need NVRAM access prior to the start
+@@ -2156,6 +2162,7 @@
  	if (options == NULL) {
  		return; // /options may not be present
  	}
@@ -922,7 +928,7 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  
  	assert(gIOOptionsEntry == NULL);
  	gIOOptionsEntry = new IODTNVRAM;
-@@ -2165,6 +2171,7 @@
+@@ -2165,6 +2172,7 @@
  	gIOOptionsEntry->init(options, gIODTPlane);
  	gIOOptionsEntry->attach(this);
  	gIOOptionsEntry->start(this);

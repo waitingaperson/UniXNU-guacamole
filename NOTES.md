@@ -232,6 +232,16 @@
   `exception_init`/`kernel_thread_create`.
 - r43 marks those as stages 64-71 (x=1100, y=220..360).
 
+- **r43 reaches stage 71.** The panel shows six columns: 28-35, 36-43,
+  44-51, 52-59, 60-67 and 68-71 (x=300/500/700/900/1100/1300). So
+  `restartable_init`, `workq_init`, `turnstiles_init`,
+  `mach_init_activity_id`, `host_statistics_init`, `exception_init` and
+  `kernel_thread_create` all return; the hang is after the context switch
+  into `kernel_bootstrap_thread`, in `idle_thread_create`,
+  `sched_startup`, `thread_daemon_init`, `thread_bind`, `mapping_adjust`,
+  `clock_service_create` or `device_service_create`.
+- r44 marks those as stages 72-79 (x=1300, y=220..360).
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

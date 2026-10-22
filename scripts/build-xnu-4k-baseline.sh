@@ -4,12 +4,16 @@ set -euo pipefail
 trap 'echo "build-xnu-4k-baseline.sh: line $LINENO: $BASH_COMMAND failed" >&2' ERR
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT"
-# xnu-10063 needs the Xcode 16 mig/iig; the macos-14 runner may default to CLT.
+# Pick the newest full Xcode when the runner only provides CommandLineTools.
 if [ -z "${DEVELOPER_DIR:-}" ]; then
-  xcode=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -r | head -1)
-  [ -z "$xcode" ] && xcode=/Applications/Xcode.app
-  if [ -d "$xcode/Contents/Developer" ]; then
+  xcode=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -r | head -1 || true)
+  if [ -n "$xcode" ] && [ -d "$xcode/Contents/Developer" ]; then
     export DEVELOPER_DIR="$xcode/Contents/Developer"
+  else
+    selected=$(xcode-select -p 2>/dev/null || true)
+    if [ -n "$selected" ] && [ -d "$selected" ]; then
+      export DEVELOPER_DIR="$selected"
+    fi
   fi
 fi
 if [ -n "${DEVELOPER_DIR:-}" ]; then

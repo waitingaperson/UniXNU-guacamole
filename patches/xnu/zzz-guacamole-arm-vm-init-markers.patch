@@ -63,7 +63,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  void
  arm_vm_init(uint64_t memory_size, boot_args * args)
  {
-@@ -1825,6 +1827,8 @@
+@@ -1825,11 +1827,16 @@
  	vm_offset_t      ptpage_vaddr;
  	vm_map_address_t dynamic_memory_begin;
  
@@ -72,7 +72,33 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  	/*
  	 * Get the virtual and physical kernel-managed memory base from boot_args.
  	 */
-@@ -2147,6 +2151,16 @@
+ 	gVirtBase = args->virtBase;
+ 	gPhysBase = args->physBase;
++
++	sweet_stage_mark(args, 17);
++
+ #if KASAN
+ 	real_phys_size = args->memSize + (shadow_ptop - shadow_pbase);
+ #else
+@@ -1911,6 +1918,8 @@
+ 		panic("Unsupported memory configuration %lx", mem_size);
+ 	}
+ 
++	sweet_stage_mark(args, 18);
++
+ 	boot_tte = (tt_entry_t *)&bootstrap_pagetables;
+ 	boot_ttep = kvtophys((vm_offset_t)boot_tte);
+ 
+@@ -2140,6 +2149,8 @@
+ 
+ 	arm_set_user_tbi();
+ 
++	sweet_stage_mark(args, 19);
++
+ 	arm_vm_physmap_init(args);
+ 	set_mmu_ttb_alternate(cpu_ttep & TTBR_BADDR_MASK);
+ 
+@@ -2147,6 +2158,16 @@
  	ml_enable_monitor();
  #endif
  
@@ -89,7 +115,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  	set_mmu_ttb(invalid_ttep & TTBR_BADDR_MASK);
  
  	flush_mmu_tlb();
-@@ -2155,6 +2169,8 @@
+@@ -2155,6 +2176,8 @@
  	cpu_tte = (tt_entry_t*)(phystokv(cpu_ttep));
  	invalid_tte = (tt_entry_t*)(phystokv(invalid_ttep));
  
@@ -98,7 +124,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  	// From here on out, we're off the bootstrap translation tables.
  
  
-@@ -2248,6 +2264,8 @@
+@@ -2248,6 +2271,8 @@
  #endif
  	pmap_bootstrap(dynamic_memory_begin);
  
@@ -107,7 +133,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  	disable_preemption();
  
  	/*
-@@ -2298,6 +2316,8 @@
+@@ -2298,6 +2323,8 @@
  		cpu_l1_tte++;
  	}
  

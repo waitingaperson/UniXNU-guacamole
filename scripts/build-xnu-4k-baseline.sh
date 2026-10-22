@@ -6,12 +6,11 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT"
 # xnu-10063 needs the Xcode 16 mig/iig; the macos-14 runner may default to CLT.
 if [ -z "${DEVELOPER_DIR:-}" ]; then
-  for xcode in /Applications/Xcode_16*.app /Applications/Xcode.app; do
-    if [ -d "$xcode/Contents/Developer" ]; then
-      export DEVELOPER_DIR="$xcode/Contents/Developer"
-      break
-    fi
-  done
+  xcode=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -r | head -1)
+  [ -z "$xcode" ] && xcode=/Applications/Xcode.app
+  if [ -d "$xcode/Contents/Developer" ]; then
+    export DEVELOPER_DIR="$xcode/Contents/Developer"
+  fi
 fi
 if [ -n "${DEVELOPER_DIR:-}" ]; then
   export PATH="$DEVELOPER_DIR/usr/bin:$DEVELOPER_DIR/Toolchains/XcodeDefault.xctoolchain/usr/bin:$PATH"

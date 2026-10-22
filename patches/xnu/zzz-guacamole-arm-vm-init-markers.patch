@@ -1,7 +1,7 @@
 diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 --- a/osfmk/arm64/sweet_stage.c
 +++ b/osfmk/arm64/sweet_stage.c
-@@ -1,8 +1,9 @@
+@@ -1,8 +1,10 @@
  /*
   * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
   * of the boot framebuffer V=P, so these writes work from C with the MMU on
@@ -9,16 +9,17 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 - * y=40+stage*20; stage 0 is the C entry and stage 7 is immediately before
 + * and without any IOKit driver. Stages are 128x4 blocks at
 + * y=40+(stage&7)*20, one column per group: 0-11 x=300, 12-15 x=500,
-+ * 16-19 x=700, 20-23 x=900, 24-27 x=1100. Stage 7 is immediately before
++ * 16-19 x=700, 20-23 x=900, 24-27 x=1100. Stages 28+ use a second band at
++ * y=220+(stage&7)*20, x=300 for 28-35. Stage 7 is immediately before
   * arm_vm_init tears down the bootstrap TTBR0.
   */
  #include <pexpert/pexpert.h>
-@@ -12,14 +13,17 @@
+@@ -12,14 +14,19 @@
  void
  sweet_stage_mark(boot_args *args, unsigned int stage)
  {
 -	static const uint32_t colors[16] = {
-+	static const uint32_t colors[28] = {
++	static const uint32_t colors[36] = {
  		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
  		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
  		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
@@ -26,15 +27,17 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +		0xffff0080u, 0xff80ff00u, 0xff4080c0u, 0xffc08040u,
 +		0xff20c0ffu, 0xffff8040u, 0xffc020ffu, 0xff80c020u,
 +		0xff00ff40u, 0xffff40ffu, 0xff40ffffu, 0xffffff80u,
-+		0xffff0000u, 0xffff8000u, 0xffffff40u, 0xffff00ffu
++		0xffff0000u, 0xffff8000u, 0xffffff40u, 0xffff00ffu,
++		0xff00ff80u, 0xff8000ffu, 0xffff0080u, 0xff80ff80u,
++		0xff8080ffu, 0xffff8080u, 0xff80ffffu, 0xffffff80u
  	};
  
 -	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 27) {
++	if (args == NULL || stage > 35) {
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,14 +35,15 @@
+@@ -31,14 +38,17 @@
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
@@ -45,17 +48,20 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
  		}
  		__asm__ volatile ("dsb sy" ::: "memory");
  	}
- 	uint32_t y = 40u + (stage & 7u) * 20u;
+-	uint32_t y = 40u + (stage & 7u) * 20u;
 -	uint32_t x = 300u;
++	uint32_t y = stage < 28u ? 40u + (stage & 7u) * 20u :
++	    220u + ((stage - 28u) & 7u) * 20u;
 +	uint32_t x = stage < 12u ? 300u : (stage < 16u ? 500u :
-+	    (stage < 20u ? 700u : (stage < 24u ? 900u : 1100u)));
++	    (stage < 20u ? 700u : (stage < 24u ? 900u :
++	    (stage < 28u ? 1100u : 300u + ((stage - 28u) / 8u) * 200u))));
  	for (uint32_t row = 0; row < 4; row++) {
  		volatile uint32_t *line = fb + (uint64_t)(y + row) * (stride / 4u);
  		for (uint32_t col = x; col < x + 128u; col++) {
 diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
 --- a/osfmk/arm64/arm_vm_init.c
 +++ b/osfmk/arm64/arm_vm_init.c
-@@ -1812,6 +1812,48 @@
+@@ -1812,6 +1812,49 @@
  #define ARM64_PHYSMAP_SLIDE_RANGE (1ULL << 30) // 1 GB
  #define ARM64_PHYSMAP_SLIDE_MASK  (ARM64_PHYSMAP_SLIDE_RANGE - 1)
  
@@ -82,7 +88,8 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
 +	if ((e1 & ARM_TTE_TYPE_MASK) != ARM_TTE_TYPE_TABLE) {
 +		return 25;
 +	}
-+	l2 = (tt_entry_t *)phystokv(e1 & ARM_TTE_TABLE_MASK);
++	/* Before the switch the bootstrap maps the tables linearly. */
++	l2 = (tt_entry_t *)((e1 & ARM_TTE_TABLE_MASK) - gPhysBase + gVirtBase);
 +	e2 = l2[L2_TABLE_INDEX(va)];
 +	if ((e2 & ARM_TTE_VALID) == 0) {
 +		return 25;
@@ -93,7 +100,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
 +	if ((e2 & ARM_TTE_TYPE_MASK) != ARM_TTE_TYPE_TABLE) {
 +		return 25;
 +	}
-+	l3 = (pt_entry_t *)phystokv(e2 & ARM_TTE_TABLE_MASK);
++	l3 = (pt_entry_t *)((e2 & ARM_TTE_TABLE_MASK) - gPhysBase + gVirtBase);
 +	p = l3[L3_TABLE_INDEX(va)];
 +	if ((p & ARM_PTE_TYPE) != ARM_PTE_TYPE) {
 +		return 26;
@@ -104,7 +111,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  void
  arm_vm_init(uint64_t memory_size, boot_args * args)
  {
-@@ -1825,11 +1867,16 @@
+@@ -1825,11 +1868,16 @@
  	vm_offset_t      ptpage_vaddr;
  	vm_map_address_t dynamic_memory_begin;
  
@@ -121,7 +128,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  #if KASAN
  	real_phys_size = args->memSize + (shadow_ptop - shadow_pbase);
  #else
-@@ -1911,6 +1958,8 @@
+@@ -1911,6 +1959,8 @@
  		panic("Unsupported memory configuration %lx", mem_size);
  	}
  
@@ -130,7 +137,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  	boot_tte = (tt_entry_t *)&bootstrap_pagetables;
  	boot_ttep = kvtophys((vm_offset_t)boot_tte);
  
-@@ -2140,21 +2189,66 @@
+@@ -2140,21 +2190,66 @@
  
  	arm_set_user_tbi();
  
@@ -199,7 +206,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  	// From here on out, we're off the bootstrap translation tables.
  
  
-@@ -2248,6 +2342,8 @@
+@@ -2248,6 +2343,8 @@
  #endif
  	pmap_bootstrap(dynamic_memory_begin);
  
@@ -208,7 +215,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  	disable_preemption();
  
  	/*
-@@ -2298,6 +2394,8 @@
+@@ -2298,6 +2395,8 @@
  		cpu_l1_tte++;
  	}
  
@@ -228,3 +235,37 @@ diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
  
  	if (debug_boot_arg) {
  		patch_low_glo();
+@@ -547,10 +548,13 @@
+ #endif
+ 
+ 	PE_consistent_debug_inherit();
++	sweet_stage_mark(args, 28);
+ 
+ 	/* Setup debugging output. */
+ 	const unsigned int serial_exists = serial_init();
++	sweet_stage_mark(args, 29);
+ 	kernel_startup_initialize_upto(STARTUP_SUB_KPRINTF);
++	sweet_stage_mark(args, 30);
+ 	kprintf("kprintf initialized\n");
+ 
+ 	serialmode = 0;
+@@ -584,6 +588,7 @@
+ 	if (kern_feature_override(KF_SERIAL_OVRD)) {
+ 		serialmode = 0;
+ 	}
++	sweet_stage_mark(args, 31);
+ 
+ 	/* Start serial if requested and a serial device was enumerated in serial_init(). */
+ 	if ((serialmode & SERIALMODE_OUTPUT) && serial_exists) {
+@@ -592,9 +597,11 @@
+ 		disableConsoleOutput = FALSE;     /* Allow printfs to happen */
+ 	}
+ 	PE_create_console();
++	sweet_stage_mark(args, 32);
+ 
+ 	/* setup console output */
+ 	PE_init_printf(FALSE);
++	sweet_stage_mark(args, 33);
+ 
+ #if __arm64__
+ #if DEBUG

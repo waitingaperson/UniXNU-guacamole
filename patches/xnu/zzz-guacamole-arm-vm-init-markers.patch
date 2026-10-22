@@ -14,12 +14,12 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
   * arm_vm_init tears down the bootstrap TTBR0.
   */
  #include <pexpert/pexpert.h>
-@@ -12,14 +14,21 @@
+@@ -12,14 +14,22 @@
  void
  sweet_stage_mark(boot_args *args, unsigned int stage)
  {
 -	static const uint32_t colors[16] = {
-+	static const uint32_t colors[44] = {
++	static const uint32_t colors[48] = {
  		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
  		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
  		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
@@ -31,15 +31,16 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +		0xff00ff80u, 0xff8000ffu, 0xffff0080u, 0xff80ff80u,
 +		0xff8080ffu, 0xffff8080u, 0xff80ffffu, 0xffffff80u,
 +		0xff20ff80u, 0xffff2080u, 0xff80ff20u, 0xff2080ffu,
-+		0xffff8020u, 0xff20ffffu, 0xffff20ffu, 0xff80ffffu
++		0xffff8020u, 0xff20ffffu, 0xffff20ffu, 0xff80ffffu,
++		0xff40ff80u, 0xffff4080u, 0xff80ff40u, 0xff4080ffu
  	};
  
 -	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 43) {
++	if (args == NULL || stage > 47) {
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,14 +40,17 @@
+@@ -31,14 +41,17 @@
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
@@ -355,7 +356,7 @@ diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
  
  
  #if HIBERNATION
-@@ -654,6 +667,7 @@
+@@ -654,9 +667,11 @@
  	if (SecureDTGetProperty(chosen, "dram-size", (void const **)&dram_size, &dt_entry_size) != kSuccess) {
  		panic("%s: Unable to find 'dram-size' entry in the 'chosen' DT node", __FUNCTION__);
  	}
@@ -363,3 +364,36 @@ diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
  
  	gDramBase = *dram_base;
  	gDramSize = *dram_size;
++	sweet_stage_mark(args, 41);
+ 
+ 	/*
+ 	 * Initialize the stack protector for all future calls
+@@ -670,6 +685,7 @@
+ 	 * against string vulnerabilities
+ 	 */
+ 	__stack_chk_guard &= ~(0xFFULL << 8);
++	sweet_stage_mark(args, 42);
+ 	machine_startup(args);
+ }
+ 
+diff --git a/osfmk/arm64/machine_routines.c b/osfmk/arm64/machine_routines.c
+--- a/osfmk/arm64/machine_routines.c
++++ b/osfmk/arm64/machine_routines.c
+@@ -476,6 +476,9 @@
+ void
+ machine_startup(__unused boot_args * args)
+ {
++	extern void sweet_stage_mark(boot_args *args, unsigned int stage);
++	sweet_stage_mark(args, 43);
++
+ #if defined(HAS_IPI) && (DEVELOPMENT || DEBUG)
+ 	if (!PE_parse_boot_argn("fastipi", &gFastIPI, sizeof(gFastIPI))) {
+ 		gFastIPI = 1;
+@@ -484,6 +487,7 @@
+ 
+ 
+ 	machine_conf();
++	sweet_stage_mark(args, 44);
+ 
+ 
+ 	/*

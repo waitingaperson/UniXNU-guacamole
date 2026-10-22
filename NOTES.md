@@ -242,6 +242,16 @@
   `clock_service_create` or `device_service_create`.
 - r44 marks those as stages 72-79 (x=1300, y=220..360).
 
+- **r44 reaches stage 75.** The x=1300 column shows the r43 colors for
+  68-71 (cyan/magenta/gray/white) and the r44 colors for 72-75
+  (black/orange/blue/green); 76-79 are absent. So
+  `kernel_bootstrap_thread`, `idle_thread_create`, `sched_startup` and
+  `thread_daemon_init` return; the hang is in
+  `kernel_startup_initialize_upto(STARTUP_SUB_THREAD_CALL)` (the
+  thread_call service), before `thread_bind`.
+- r45 marks before/after that startup phase (80/81) and the following
+  calls (82-86), with a new y=380 band for stages 80+.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

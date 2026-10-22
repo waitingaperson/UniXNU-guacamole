@@ -68,7 +68,7 @@
   sha256 `710522bc...`). The planner resolves AMFI, PMGR, CoreTrust,
   AppleImage4, corecrypto, HFS, storage and HID dependencies.
   `slide=-0x1000000`, matching the sheng-qualified kernelcache base.
-- **SM8150 UFS port compiles in the 4K kernel.** `patches/xnu/0400-guacamole-ufs-root.patch` adds the proven ios-sweet `bsd/dev/sweet_ufs.c` driver and routes `rd=ufsroot0` to it from `IOKitBSDInit`. It reads `/sweet-ufs` from the ADT and exposes the `userdata` GPT partition as `ufsroot0`. CI run `39707207800` built and sealed it without errors; the next boot test will use it.
+- **SM8150 UFS port compiles in the 4K kernel.** `patches/xnu/0400-guacamole-ufs-root.patch` adds the proven ios-sweet `bsd/dev/sweet_ufs.c` driver and routes `rd=ufsroot0` to it from `IOKitBSDInit`. It reads `/sweet-ufs` from the ADT and exposes the `userdata` GPT partition as `ufsroot0`. CI run `39707207800` built and sealed it without errors. The UFS kernel is 15,246,152 bytes, sha256 `0f031930...`; the prelinked image is 53,133,312 bytes, sha256 `b7a2f223...`. The next boot test will use it.
 - **NativeUfs is not portable as-is.** It matches
   `qcom,sm8550-ufshc` and uses sheng's GCC/UFS windows, so it cannot bind
   guacamole's SM8150 controller. The ios-sweet UFS driver is the current

@@ -1,6 +1,7 @@
-# First UniXNU-built kernel for the iPhone X 16.7.16 userland.
-# No storage, display or GPU drivers yet: this milestone only has to compile
-# the 4 KiB BCM2837 kernel and link the generic platform expert and CPU.
+# First xnu-10063 (iPadOS 17.7.11) kernel build for guacamole.
+# This milestone is compile-only: generic ArmDTPlatform/ArmCpu, source
+# corecrypto/pthread and the built-in SM8150 UFS driver. Display, iPad7,1
+# ADT and the iPadOS rootfs are the next porting stages.
 
 CONFIG_XNU_SOURCE_CORECRYPTO14=y
 CONFIG_XNU_SOURCE_PTHREAD=y

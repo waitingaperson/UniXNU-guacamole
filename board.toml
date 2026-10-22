@@ -46,8 +46,8 @@ MU_SCHEMA_DIR = "{uefi}/Common/MU/AndromedaPkg/CfgData"
 MU_SCHEMA_FILE_NAME = "AndromedaPkgCfgData.xml"
 
 [kernel]
-# 4 KiB BCM2837 build with the iOS 16.7.16 source and UniXNU 4K patches.
-defconfig = "guacamole_8796_defconfig"
+# 4 KiB BCM2837 build with the xnu-10063.141.1 (iPadOS 17.7.11) source.
+defconfig = "guacamole_10063_defconfig"
 archives = [
   "build-corecrypto-14.py",
   "build-corecrypto-14.py --namespace",

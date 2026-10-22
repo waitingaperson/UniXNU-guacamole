@@ -1,0 +1,15 @@
+--- a/osfmk/arm64/start.s	2026-10-22 10:47:35.820999227 +0800
++++ b/osfmk/arm64/start.s	2026-10-22 10:47:38.929052557 +0800
+@@ -769,12 +769,6 @@
+ 	MSR_SCTLR_EL1_X0
+ 	isb		sy
+ 
+-#if !VMAPPLE
+-	MOV64   x1, SCTLR_EL1_DEFAULT
+-	cmp		x0, x1
+-	bne		.
+-#endif /* !VMAPPLE */
+-
+ #if (!CONFIG_KERNEL_INTEGRITY || (CONFIG_KERNEL_INTEGRITY && !defined(KERNEL_INTEGRITY_WT)))
+ 	/* Watchtower
+ 	 *

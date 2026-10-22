@@ -1,0 +1,58 @@
+--- a/osfmk/arm64/sweet_stage.c	2026-10-22 12:03:53.531216507 +0800
++++ b/osfmk/arm64/sweet_stage.c	2026-10-22 12:03:53.547790042 +0800
+@@ -28,6 +28,15 @@
+ 		return;
+ 	}
+ 	volatile uint32_t *fb = (volatile uint32_t *)(uintptr_t)base;
++	if (stage == 0) {
++		for (uint32_t row = 0; row < 160; row++) {
++			volatile uint32_t *line = fb + (uint64_t)(340u + row) * (stride / 4u);
++			for (uint32_t col = 300; col < 628; col++) {
++				line[col] = 0;
++			}
++		}
++		__asm__ volatile ("dsb sy" ::: "memory");
++	}
+ 	uint32_t y = 340u + (stage & 7u) * 20u;
+ 	uint32_t x = 300u;
+ 	for (uint32_t row = 0; row < 16; row++) {
+--- a/osfmk/arm/arm_init.c	2026-10-22 12:03:53.531546192 +0800
++++ b/osfmk/arm/arm_init.c	2026-10-22 12:03:53.548508390 +0800
+@@ -349,8 +349,10 @@
+ 
+ 	sweet_stage_mark(args, 0);
+ 	arm_setup_pre_sign();
++	sweet_stage_mark(args, 8);
+ 
+ 	arm_slide_rebase_and_sign_image();
++	sweet_stage_mark(args, 9);
+ 
+ 	/* If kernel integrity is supported, use a constant copy of the boot args. */
+ 	const_boot_args = *args;
+@@ -363,16 +365,15 @@
+ 	BootCpuData.jop_key = ml_default_jop_pid();
+ #endif /* defined(HAS_APPLE_PAC) */
+ 
++	sweet_stage_mark(args, 10);
+ 	PE_init_platform(FALSE, args); /* Get platform expert set up */
++	sweet_stage_mark(args, 11);
+ 	sweet_stage_mark(args, 1);
+ 
+ #if __arm64__
+ 	configure_timer_apple_regs();
+-	sweet_stage_mark(args, 8);
+ 	wfe_timeout_configure();
+-	sweet_stage_mark(args, 9);
+ 	wfe_timeout_init();
+-	sweet_stage_mark(args, 10);
+ 
+ 	configure_misc_apple_boot_args();
+ 	configure_misc_apple_regs();
+@@ -438,7 +439,6 @@
+ 	}
+ #endif
+ 
+-	sweet_stage_mark(args, 11);
+ 	ml_parse_cpu_topology();
+ 	sweet_stage_mark(args, 2);
+ 

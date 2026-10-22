@@ -276,6 +276,13 @@
   `initialize_screen(kPEAcquireScreen)`.
 - r48 marks those as stages 95-102.
 
+- **r48 reaches stage 96.** The digit shows 96, so the SYSCTL startup phase
+  and the `vm_kernel_addrperm`/`early_random` block return; stage 97 (after
+  `PE_init_iokit`) never appears. The hang is inside `PE_init_iokit()`:
+  `PE_init_printf(TRUE)` (`vcattach`), `pe_prepare_images`,
+  `InitIOKit(PE_state.deviceTreeHead)` or `ConfigureIOKit()`.
+- r49 marks those internally as stages 104-109.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

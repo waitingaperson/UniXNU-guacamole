@@ -1,7 +1,7 @@
 diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 --- a/osfmk/arm64/sweet_stage.c
 +++ b/osfmk/arm64/sweet_stage.c
-@@ -1,25 +1,128 @@
+@@ -1,25 +1,130 @@
  /*
   * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
   * of the boot framebuffer V=P, so these writes work from C with the MMU on
@@ -98,7 +98,7 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +	if (args == NULL) {
 +		args = sweet_stage_args;
 +	}
-+	static const uint32_t colors[112] = {
++	static const uint32_t colors[120] = {
  		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
  		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
  		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
@@ -127,15 +127,17 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +		0xffa02020u, 0xff20a020u, 0xff2020a0u, 0xffa0a020u,
 +		0xff20a0a0u, 0xffa020a0u, 0xffe0e0e0u, 0xff606060u,
 +		0xffc04040u, 0xff40c040u, 0xff4040c0u, 0xffc0c040u,
-+		0xff40c0c0u, 0xffc040c0u, 0xffffe0e0u, 0xff404040u
++		0xff40c0c0u, 0xffc040c0u, 0xffffe0e0u, 0xff404040u,
++		0xffffff00u, 0xff00ffffu, 0xffff00ffu, 0xff00ff00u,
++		0xffff0000u, 0xff0000ffu, 0xff808080u, 0xffc0c0c0u
  	};
  
 -	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 111) {
++	if (args == NULL || stage > 119) {
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,19 +134,25 @@
+@@ -31,19 +136,25 @@
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
@@ -888,3 +890,43 @@ diff --git a/pexpert/arm/pe_init.c b/pexpert/arm/pe_init.c
  }
  
  void
+diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.cpp
+--- a/iokit/Kernel/IOPlatformExpert.cpp
++++ b/iokit/Kernel/IOPlatformExpert.cpp
+@@ -2130,7 +2130,10 @@
+ void
+ IOPlatformExpertDevice::configureDefaults( void )
+ {
++	extern void sweet_stage_mark(boot_args *args, unsigned int stage);
++	sweet_stage_mark(NULL, 110);
+ 	createNVRAM();
++	sweet_stage_mark(NULL, 111);
+ 	// Parse the serial-number data and publish a user-readable string
+ 	OSData* mydata = (OSData*) (getProperty("serial-number"));
+ 	if (mydata != NULL) {
+@@ -2140,7 +2143,9 @@
+ 			serNoString->release();
+ 		}
+ 	}
++	sweet_stage_mark(NULL, 112);
+ 	generatePlatformUUID();
++	sweet_stage_mark(NULL, 113);
+ }
+ 
+ void
+@@ -2156,6 +2161,7 @@
+ 	if (options == NULL) {
+ 		return; // /options may not be present
+ 	}
++	sweet_stage_mark(NULL, 114);
+ 
+ 	assert(gIOOptionsEntry == NULL);
+ 	gIOOptionsEntry = new IODTNVRAM;
+@@ -2165,6 +2171,7 @@
+ 	gIOOptionsEntry->init(options, gIODTPlane);
+ 	gIOOptionsEntry->attach(this);
+ 	gIOOptionsEntry->start(this);
++	sweet_stage_mark(NULL, 115);
+ 	options->release();
+ }
+ 

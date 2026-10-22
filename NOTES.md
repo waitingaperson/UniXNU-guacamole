@@ -223,6 +223,15 @@
   `code_signing_init`, `task_init`/`thread_init` or
   `kernel_thread_create`. r42 marks those as stages 56-63.
 
+- **r42 reaches stage 63.** The x=900 column shows all eight bars
+  (56-59 at y=300..360 and 60-63 overwriting 52-55 at y=220..280), so
+  `machine_init`, `thread_machine_init_template`, `clock_init`,
+  `thread_group_init`, `coalitions_init`, `code_signing_init`,
+  `task_init` and `thread_init` all return. The hang is after
+  `thread_init`, in `restartable_init`/`workq_init`/`turnstiles_init`/
+  `exception_init`/`kernel_thread_create`.
+- r43 marks those as stages 64-71 (x=1100, y=220..360).
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

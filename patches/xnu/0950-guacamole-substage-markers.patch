@@ -1,0 +1,56 @@
+--- a/osfmk/arm64/sweet_stage.c	2026-10-22 11:31:58.963487179 +0800
++++ b/osfmk/arm64/sweet_stage.c	2026-10-22 11:31:58.980925878 +0800
+@@ -12,12 +12,14 @@
+ void
+ sweet_stage_mark(boot_args *args, unsigned int stage)
+ {
+-	static const uint32_t colors[8] = {
++	static const uint32_t colors[16] = {
+ 		0xffff0000u, 0xff00ff00u, 0xff0000ffu, 0xffffff00u,
+-		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu
++		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
++		0xffff8000u, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
++		0xffff0080u, 0xff80ff00u, 0xff4080c0u, 0xffc08040u
+ 	};
+ 
+-	if (args == NULL || stage > 7) {
++	if (args == NULL || stage > 15) {
+ 		return;
+ 	}
+ 	uint64_t base = args->Video.v_baseAddr;
+@@ -26,10 +28,11 @@
+ 		return;
+ 	}
+ 	volatile uint32_t *fb = (volatile uint32_t *)(uintptr_t)base;
+-	uint32_t y = 340u + stage * 20u;
++	uint32_t y = 340u + (stage & 7u) * 20u;
++	uint32_t x = stage < 8u ? 300u : 500u;
+ 	for (uint32_t row = 0; row < 16; row++) {
+ 		volatile uint32_t *line = fb + (uint64_t)(y + row) * (stride / 4u);
+-		for (uint32_t col = 300; col < 428; col++) {
++		for (uint32_t col = x; col < x + 128u; col++) {
+ 			line[col] = colors[stage];
+ 		}
+ 	}
+--- a/osfmk/arm/arm_init.c	2026-10-22 11:31:58.963521854 +0800
++++ b/osfmk/arm/arm_init.c	2026-10-22 11:31:58.981032711 +0800
+@@ -368,8 +368,11 @@
+ 
+ #if __arm64__
+ 	configure_timer_apple_regs();
++	sweet_stage_mark(args, 8);
+ 	wfe_timeout_configure();
++	sweet_stage_mark(args, 9);
+ 	wfe_timeout_init();
++	sweet_stage_mark(args, 10);
+ 
+ 	configure_misc_apple_boot_args();
+ 	configure_misc_apple_regs();
+@@ -435,6 +438,7 @@
+ 	}
+ #endif
+ 
++	sweet_stage_mark(args, 11);
+ 	ml_parse_cpu_topology();
+ 	sweet_stage_mark(args, 2);
+ 

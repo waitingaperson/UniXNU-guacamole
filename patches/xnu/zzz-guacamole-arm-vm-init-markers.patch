@@ -1,7 +1,7 @@
 diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 --- a/osfmk/arm64/sweet_stage.c
 +++ b/osfmk/arm64/sweet_stage.c
-@@ -1,25 +1,50 @@
+@@ -1,25 +1,52 @@
  /*
   * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
   * of the boot framebuffer V=P, so these writes work from C with the MMU on
@@ -19,20 +19,20 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
  
 +static boot_args *sweet_stage_args;
 +
-+void
+ void
 +sweet_stage_set_args(boot_args *args)
 +{
 +	sweet_stage_args = args;
 +}
 +
- void
++void
  sweet_stage_mark(boot_args *args, unsigned int stage)
  {
 -	static const uint32_t colors[16] = {
 +	if (args == NULL) {
 +		args = sweet_stage_args;
 +	}
-+	static const uint32_t colors[64] = {
++	static const uint32_t colors[72] = {
  		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
  		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
  		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
@@ -49,15 +49,17 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +		0xffffc040u, 0xff40c0ffu, 0xffc0ff40u, 0xffff40c0u,
 +		0xff40ffc0u, 0xffc040ffu, 0xffffc0c0u, 0xffc0c0ffu,
 +		0xff80c0ffu, 0xffffc080u, 0xffc0ff80u, 0xffff80c0u,
-+		0xff80ffc0u, 0xffc080ffu, 0xffffc0ffu, 0xffc0ffffu
++		0xff80ffc0u, 0xffc080ffu, 0xffffc0ffu, 0xffc0ffffu,
++		0xff60ff60u, 0xffff6060u, 0xff6060ffu, 0xffffff60u,
++		0xff60ffffu, 0xffff60ffu, 0xffa0a0a0u, 0xffffffffu
  	};
  
 -	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 63) {
++	if (args == NULL || stage > 71) {
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,14 +56,17 @@
+@@ -31,14 +58,17 @@
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
@@ -505,7 +507,7 @@ diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
  
  	/*
  	 *	Initialize the IPC, task, and thread subsystems.
-@@ -515,22 +531,27 @@
+@@ -515,46 +531,58 @@
  #if CONFIG_THREAD_GROUPS
  	kernel_bootstrap_log("thread_group_init");
  	thread_group_init();
@@ -533,3 +535,42 @@ diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
  
  	kernel_bootstrap_log("restartable_init");
  	restartable_init();
++	sweet_stage_mark(NULL, 64);
+ 
+ 	kernel_bootstrap_log("workq_init");
+ 	workq_init();
++	sweet_stage_mark(NULL, 65);
+ 
+ 	kernel_bootstrap_log("turnstiles_init");
+ 	turnstiles_init();
++	sweet_stage_mark(NULL, 66);
+ 
+ 	kernel_bootstrap_log("mach_init_activity_id");
+ 	mach_init_activity_id();
++	sweet_stage_mark(NULL, 67);
+ 
+ 	/* initialize host_statistics */
+ 	host_statistics_init();
++	sweet_stage_mark(NULL, 68);
+ 
+ 	/* initialize exceptions */
+ 	kernel_bootstrap_log("exception_init");
+ 	exception_init();
++	sweet_stage_mark(NULL, 69);
+ 
+ #if CONFIG_SCHED_SFI
+ 	kernel_bootstrap_log("sfi_init");
+ 	sfi_init();
+ #endif
++	sweet_stage_mark(NULL, 70);
+ 
+ 	/*
+ 	 *	Create a kernel thread to execute the kernel bootstrap.
+@@ -562,6 +590,7 @@
+ 
+ 	kernel_bootstrap_log("kernel_thread_create");
+ 	result = kernel_thread_create((thread_continue_t)kernel_bootstrap_thread, NULL, MAXPRI_KERNEL, &thread);
++	sweet_stage_mark(NULL, 71);
+ 
+ 	if (result != KERN_SUCCESS) {
+ 		panic("kernel_bootstrap: result = %08X", result);

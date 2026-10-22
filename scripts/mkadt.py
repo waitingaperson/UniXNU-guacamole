@@ -56,7 +56,24 @@ def node(name, props=(), children=()):
     return n
 
 
-def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None, owned_memory_size=None):
+def ipad_product(dev):
+    """The unchanged iPad7,1 /product identity, with this board's model."""
+    return [
+        ('product-name', cstr('iPad Pro (12.9-inch) (2nd generation)')),
+        ('model', cstr(dev['board_compat'])),
+        ('product-description', cstr('iPad Pro (12.9-inch) (2nd generation)')),
+        ('artwork-device-idiom', cstr('pad')),
+        ('artwork-device-subtype', u32(2732)),
+        ('artwork-scale-factor', u32(2)),
+        ('artwork-display-gamut', cstr('P3')),
+        ('compatible-device-fallback', cstr('iPad6,7')),
+        ('thin-bezel', u32(1)),
+    ]
+
+
+def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
+          owned_memory_size=None, ipad_identity=False, root_match_uuid=None,
+          ipad_chip_id=0x207):
     """qemu=True: same tree, but with QEMU virt's GIC addresses and CNTFRQ (tools/qemu-sweet.py).
     dram_size overrides the profile's kernel RAM size (e.g. 0x180000000 on an 8 GB guacamole).
     owned_memory_size emits /chosen/darwinboot-memory-size for the contiguous kernel window."""
@@ -75,6 +92,13 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None, 
     seed = seed if seed is not None else os.urandom(64)
     phandle = iter(range(1, 1000))
     ph = lambda: ('AAPL,phandle', u32(next(phandle)))
+
+    root_matching = None
+    if root_match_uuid:
+        root_matching = (
+            '<dict><key>IOProviderClass</key><string>IOMedia</string>'
+            '<key>IOPropertyMatch</key><dict><key>UUID</key><string>'
+            + root_match_uuid.upper() + '</string></dict></dict>')
 
     chosen = node('chosen', [
         ph(),
@@ -96,14 +120,14 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None, 
         # from /chosen, the pixel size from IOMobileFramebuffer. Scale 0 makes
         # SpringBoard's FBSDisplayMode "infxinf@0x" invalid. 1080x2400 @3x =
         # 360x800 points (like iPhone X class devices).
-        ('display-scale', u32(3)),
+        ('display-scale', u32(2 if ipad_identity else 3)),
         # XNU derives IOPlatformUUID (gethostuuid) from these on arm; without
         # them CFPreferences cannot use kCFPreferencesCurrentHost (no ByHost
         # files), so e.g. DataMigration never records LastSystemVersion and
         # migrates on every boot. Synthetic ECID (not the phone's); chip-id
         # of the A11 that the iPhone X userland expects.
         ('unique-chip-id', struct.pack('<Q', SWEET_ECID)),
-        ('chip-id', u32(0x8015)),
+        ('chip-id', u32(ipad_chip_id if ipad_identity else 0x8015)),
         # Security status as on a dev-fused, undemoted board (tuple 0,0,1,1):
         # MobileGestalt reads these from /chosen, and mobileactivationd's
         # DeviceType then takes its native "Hactivation" branch (state
@@ -112,6 +136,8 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None, 
         ('effective-production-status-ap', u32(0)),
         ('certificate-security-mode', u32(1)),
         ('effective-security-mode-sep', u32(1)),
+        *([('amfi-only-platform-code', u32(1))] if ipad_identity else []),
+        *([('root-matching', cstr(root_matching))] if root_matching else []),
     ], [node('memory-map', [ph()]),
         # Local boot policy (kern_csr.c): SIP relaxed like `csrutil disable`
         # (lp-sip0: untrusted kexts, unrestricted FS, task_for_pid, kernel
@@ -205,24 +231,40 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None, 
     # (D22AP: 2, no Home button; absent = 0 = Home-button device).
     buttons = node('buttons', [
         ph(),
-        ('button-names', cstr('volup') + cstr('voldown') + cstr('hold')),
+        ('button-names', (cstr('hold') + cstr('voldown') + cstr('volup'))
+            if ipad_identity else (cstr('volup') + cstr('voldown') + cstr('hold'))),
         ('home-button-type', u32(2)),
         ('opposed-power-vol-buttons', u32(1)),
     ])
 
-    product_props = d22ap_product()
-    product = [node('product', [ph()] + product_props)] if product_props else []
+    if ipad_identity:
+        product = [node('product', [ph()] + ipad_product(dev))]
+    else:
+        product_props = d22ap_product()
+        product = [node('product', [ph()] + product_props)] if product_props else []
 
     # Identity of the iPhone X whose userland runs here: compatible[0] is
     # hw.model/hw.target (D22AP), model is hw.machine/hw.product
     # (iPhone10,3). The board/SOC strings (devices.py) stay for the
     # SweetPlatformExpert matching and for the live FDT audits.
+    if ipad_identity:
+        identity = [
+            ('compatible', cstr('J120AP') + cstr('iPad7,1') + cstr(dev['board_compat']) + cstr(dev['soc_compat']) + cstr('AppleARM')),
+            ('model', cstr('iPad7,1')),
+            ('target-type', cstr('J120')),
+            ('target-sub-type', cstr('J120AP')),
+        ]
+    else:
+        identity = [
+            ('compatible', cstr('D22AP') + cstr('iPhone10,3') + cstr(dev['board_compat']) + cstr(dev['soc_compat']) + cstr('AppleARM')),
+            ('model', cstr('iPhone10,3')),
+            ('target-type', cstr('D22')),
+            ('target-sub-type', cstr('D22AP')),
+        ]
+
     return node('device-tree', [
         ph(),
-        ('compatible', cstr('D22AP') + cstr('iPhone10,3') + cstr(dev['board_compat']) + cstr(dev['soc_compat']) + cstr('AppleARM')),
-        ('model', cstr('iPhone10,3')),
-        ('target-type', cstr('D22')),
-        ('target-sub-type', cstr('D22AP')),
+        *identity,
         ('manufacturer', cstr('Apple Inc.')),
         ('#address-cells', u32(2)),
         ('#size-cells', u32(2)),
@@ -241,6 +283,12 @@ if __name__ == '__main__':
                     help='override the kernel RAM size, e.g. 0x180000000 for an 8 GB guacamole')
     ap.add_argument('--owned-memory-size', type=lambda s: int(s, 0), default=None,
                     help='DarwinBoot contiguous window in bytes (256 MiB..8 GiB, 2 MiB steps)')
+    ap.add_argument('--ipad-identity', action='store_true',
+                    help='use the iPad7,1/J120AP identity and /product nodes')
+    ap.add_argument('--chip-id', type=lambda s: int(s, 16), default=None,
+                    help='/chosen/chip-id for the iPad identity (hex)')
+    ap.add_argument('--root-match-volume-uuid', default=None,
+                    help='/chosen/root-matching Data volume UUID')
     ap.add_argument('--dump', action='store_true')
     args = ap.parse_args()
     if args.dump and os.path.exists(args.out):
@@ -252,7 +300,10 @@ if __name__ == '__main__':
         print(f'{args.out}: {len(blob)} bytes (existing file, not rebuilt)', file=sys.stderr)
         sys.exit(0)
     root = build(qemu=args.qemu, highmem=args.highmem, device=args.device,
-                 dram_size=args.dram_size, owned_memory_size=args.owned_memory_size)
+                 dram_size=args.dram_size, owned_memory_size=args.owned_memory_size,
+                 ipad_identity=args.ipad_identity,
+                 root_match_uuid=args.root_match_volume_uuid,
+                 ipad_chip_id=args.chip_id or 0x207)
     blob = adt.serialize(root)
     open(args.out, 'wb').write(blob)
     if args.dump:

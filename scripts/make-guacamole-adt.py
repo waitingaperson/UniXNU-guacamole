@@ -17,12 +17,21 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--dram-size", default="0xc0000000")
     parser.add_argument("--owned-memory-size", type=lambda value: int(value, 0))
+    parser.add_argument("--ipad-identity", action="store_true")
+    parser.add_argument("--chip-id")
+    parser.add_argument("--root-match-volume-uuid")
     known, _unknown = parser.parse_known_args()
     tool = Path(__file__).resolve().parent / "mkadt.py"
     command = [sys.executable, str(tool), known.output, "--device", "guacamole",
                "--dram-size", known.dram_size]
     if known.owned_memory_size is not None:
         command += ["--owned-memory-size", str(known.owned_memory_size)]
+    if known.ipad_identity:
+        command.append("--ipad-identity")
+    if known.chip_id:
+        command += ["--chip-id", str(known.chip_id)]
+    if known.root_match_volume_uuid:
+        command += ["--root-match-volume-uuid", known.root_match_volume_uuid]
     subprocess.run(command, check=True)
 
 

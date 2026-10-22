@@ -283,6 +283,14 @@
   `InitIOKit(PE_state.deviceTreeHead)` or `ConfigureIOKit()`.
 - r49 marks those internally as stages 104-109.
 
+- **r49 reaches stage 108.** The digit shows 108, so `PE_init_iokit`'s
+  `PE_init_printf(TRUE)`, `pe_prepare_images` and
+  `InitIOKit(PE_state.deviceTreeHead)` all return; stage 109
+  (`ConfigureIOKit`) never appears. `ConfigureIOKit` is
+  `gRootNub->configureDefaults()`, i.e. `createNVRAM`,
+  `serial-number` publishing or `generatePlatformUUID`.
+- r50 marks `configureDefaults` (110-113) and `createNVRAM` (114-115).
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

@@ -1,0 +1,29 @@
+diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
+--- a/osfmk/arm64/sweet_stage.c
++++ b/osfmk/arm64/sweet_stage.c
+@@ -2,7 +2,7 @@
+  * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
+  * of the boot framebuffer V=P, so these writes work from C with the MMU on
+  * and without any IOKit driver. Each stage is a 128x4 block at x=300,
+- * y=340+stage*20; stage 0 is the C entry and stage 7 is immediately before
++ * y=40+stage*20; stage 0 is the C entry and stage 7 is immediately before
+  * arm_vm_init tears down the bootstrap TTBR0.
+  */
+ #include <pexpert/pexpert.h>
+@@ -30,14 +30,14 @@
+ 	volatile uint32_t *fb = (volatile uint32_t *)(uintptr_t)base;
+ 	if (stage == 0) {
+ 		for (uint32_t row = 0; row < 144; row++) {
+-			volatile uint32_t *line = fb + (uint64_t)(340u + row) * (stride / 4u);
++			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
+ 			for (uint32_t col = 300; col < 628; col++) {
+ 				line[col] = 0;
+ 			}
+ 		}
+ 		__asm__ volatile ("dsb sy" ::: "memory");
+ 	}
+-	uint32_t y = 340u + (stage & 7u) * 20u;
++	uint32_t y = 40u + (stage & 7u) * 20u;
+ 	uint32_t x = 300u;
+ 	for (uint32_t row = 0; row < 4; row++) {
+ 		volatile uint32_t *line = fb + (uint64_t)(y + row) * (stride / 4u);

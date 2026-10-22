@@ -1,7 +1,7 @@
 diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 --- a/osfmk/arm64/sweet_stage.c
 +++ b/osfmk/arm64/sweet_stage.c
-@@ -1,25 +1,126 @@
+@@ -1,25 +1,128 @@
  /*
   * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
   * of the boot framebuffer V=P, so these writes work from C with the MMU on
@@ -98,7 +98,7 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +	if (args == NULL) {
 +		args = sweet_stage_args;
 +	}
-+	static const uint32_t colors[104] = {
++	static const uint32_t colors[112] = {
  		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
  		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
  		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
@@ -125,15 +125,17 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +		0xff202060u, 0xffff6020u, 0xff2060ffu, 0xff60ff20u,
 +		0xffff2060u, 0xff20ff60u, 0xff6020ffu, 0xffff2060u,
 +		0xffa02020u, 0xff20a020u, 0xff2020a0u, 0xffa0a020u,
-+		0xff20a0a0u, 0xffa020a0u, 0xffe0e0e0u, 0xff606060u
++		0xff20a0a0u, 0xffa020a0u, 0xffe0e0e0u, 0xff606060u,
++		0xffc04040u, 0xff40c040u, 0xff4040c0u, 0xffc0c040u,
++		0xff40c0c0u, 0xffc040c0u, 0xffffe0e0u, 0xff404040u
  	};
  
 -	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 103) {
++	if (args == NULL || stage > 111) {
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,19 +132,25 @@
+@@ -31,19 +134,25 @@
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
@@ -852,3 +854,37 @@ diff --git a/osfmk/vm/analytics.c b/osfmk/vm/analytics.c
  	vm_analytics_thread_call = thread_call_allocate_with_options(vm_analytics_tick, NULL, THREAD_CALL_PRIORITY_KERNEL, THREAD_CALL_OPTIONS_ONCE);
  	schedule_analytics_thread_call();
  }
+diff --git a/pexpert/arm/pe_init.c b/pexpert/arm/pe_init.c
+--- a/pexpert/arm/pe_init.c
++++ b/pexpert/arm/pe_init.c
+@@ -255,7 +255,10 @@
+ 	uint32_t        load_kernel_start_value = 0;
+ 	uint32_t        populate_registry_time_value = 0;
+ 
++	extern void sweet_stage_mark(boot_args *args, unsigned int stage);
++	sweet_stage_mark(NULL, 104);
+ 	PE_init_printf(TRUE);
++	sweet_stage_mark(NULL, 105);
+ 
+ 	printf("iBoot version: %s\n", iBoot_version);
+ #if defined(TARGET_OS_OSX) && defined(__arm64__)
+@@ -280,6 +283,7 @@
+ 	}
+ 
+ 	pe_prepare_images();
++	sweet_stage_mark(NULL, 106);
+ 
+ 	scale = PE_state.video.v_scale;
+ 	flip = 1;
+@@ -368,8 +372,11 @@
+ 		KDBG_RELEASE(IOKDBG_CODE(DBG_BOOTER, 0), start_time_value, debug_wait_start_value, load_kernel_start_value, populate_registry_time_value);
+ 	}
+ 
++	sweet_stage_mark(NULL, 107);
+ 	InitIOKit(PE_state.deviceTreeHead);
++	sweet_stage_mark(NULL, 108);
+ 	ConfigureIOKit();
++	sweet_stage_mark(NULL, 109);
+ }
+ 
+ void

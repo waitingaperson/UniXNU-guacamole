@@ -115,6 +115,15 @@
   - kernel `aebafc39...`, 15,298,200 bytes;
   - `boot-32-r36.img` sha256 `907f779a...`, payload `875214bc...`;
   - control `boot-32-r36b.img` sha256 `ebe9d9c8...`, payload `04cd73eb...`.
+- **Static checks on the 4K tables do not reproduce a fault.** The built
+  kernel's `sysreg_restore.tcr_el1` decodes to `TG0=4K`, `TG1=4K`,
+  `T0SZ=T1SZ=26` (38-bit VA), IPS 40-bit, so the hardware root is L1 with
+  the 8-bit index the code uses. A host model of `init_ptpages` plus
+  `arm_vm_page_granular_*` over the real segment list maps `arm_vm_init`
+  and `sweet_stage_mark` as valid executable 4K pages, and maps the boot
+  stack (`__BOOTDATA`, `excepstack_top` at `0xfffffff007fb4000`) writable.
+  The next discriminator is therefore the hardware marker, not more static
+  analysis.
 
 ## 2026-10-21: project split
 

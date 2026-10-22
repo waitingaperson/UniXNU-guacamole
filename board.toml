@@ -80,7 +80,6 @@ panic_screen = false
 timeout = 3
 kernel_args = [
   "debug=0xc",
-  "serial=3",
   "cpus=8",
   "keepsyms=1",
   "-enable_kprintf_spam",

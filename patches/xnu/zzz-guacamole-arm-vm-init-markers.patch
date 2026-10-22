@@ -1,7 +1,7 @@
 diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 --- a/osfmk/arm64/sweet_stage.c
 +++ b/osfmk/arm64/sweet_stage.c
-@@ -1,25 +1,48 @@
+@@ -1,25 +1,50 @@
  /*
   * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
   * of the boot framebuffer V=P, so these writes work from C with the MMU on
@@ -19,20 +19,20 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
  
 +static boot_args *sweet_stage_args;
 +
- void
++void
 +sweet_stage_set_args(boot_args *args)
 +{
 +	sweet_stage_args = args;
 +}
 +
-+void
+ void
  sweet_stage_mark(boot_args *args, unsigned int stage)
  {
 -	static const uint32_t colors[16] = {
 +	if (args == NULL) {
 +		args = sweet_stage_args;
 +	}
-+	static const uint32_t colors[56] = {
++	static const uint32_t colors[64] = {
  		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
  		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
  		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
@@ -47,15 +47,17 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +		0xffff8020u, 0xff20ffffu, 0xffff20ffu, 0xff80ffffu,
 +		0xff40ff80u, 0xffff4080u, 0xff80ff40u, 0xff4080ffu,
 +		0xffffc040u, 0xff40c0ffu, 0xffc0ff40u, 0xffff40c0u,
-+		0xff40ffc0u, 0xffc040ffu, 0xffffc0c0u, 0xffc0c0ffu
++		0xff40ffc0u, 0xffc040ffu, 0xffffc0c0u, 0xffc0c0ffu,
++		0xff80c0ffu, 0xffffc080u, 0xffc0ff80u, 0xffff80c0u,
++		0xff80ffc0u, 0xffc080ffu, 0xffffc0ffu, 0xffc0ffffu
  	};
  
 -	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 55) {
++	if (args == NULL || stage > 63) {
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,14 +54,17 @@
+@@ -31,14 +56,17 @@
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
@@ -479,7 +481,7 @@ diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
  
  	/*
  	 * As soon as the virtual memory system is up, we record
-@@ -496,9 +507,11 @@
+@@ -496,18 +507,23 @@
  	 */
  	kernel_bootstrap_log("PMAP_ACTIVATE_KERNEL");
  	PMAP_ACTIVATE_KERNEL(master_cpu);
@@ -491,3 +493,43 @@ diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
  
  	kernel_bootstrap_log("machine_init");
  	machine_init();
++	sweet_stage_mark(NULL, 56);
+ 
+ 	kernel_bootstrap_log("thread_machine_init_template");
+ 	thread_machine_init_template();
++	sweet_stage_mark(NULL, 57);
+ 
+ 	kernel_bootstrap_log("clock_init");
+ 	clock_init();
++	sweet_stage_mark(NULL, 58);
+ 
+ 	/*
+ 	 *	Initialize the IPC, task, and thread subsystems.
+@@ -515,22 +531,27 @@
+ #if CONFIG_THREAD_GROUPS
+ 	kernel_bootstrap_log("thread_group_init");
+ 	thread_group_init();
++	sweet_stage_mark(NULL, 59);
+ #endif
+ 
+ #if CONFIG_COALITIONS
+ 	kernel_bootstrap_log("coalitions_init");
+ 	coalitions_init();
++	sweet_stage_mark(NULL, 60);
+ #endif
+ 
+ 	kernel_bootstrap_log("code_signing_init");
+ 	code_signing_init();
+ 	code_signing_configuration(NULL, NULL);
++	sweet_stage_mark(NULL, 61);
+ 
+ 	kernel_bootstrap_log("task_init");
+ 	task_init();
++	sweet_stage_mark(NULL, 62);
+ 
+ 	kernel_bootstrap_log("thread_init");
+ 	thread_init();
++	sweet_stage_mark(NULL, 63);
+ 
+ 	kernel_bootstrap_log("restartable_init");
+ 	restartable_init();

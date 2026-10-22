@@ -291,6 +291,11 @@
   `serial-number` publishing or `generatePlatformUUID`.
 - r50 marks `configureDefaults` (110-113) and `createNVRAM` (114-115).
 
+- r50/r51 did not build: the first missed the `sweet_stage_mark` extern in
+  `createNVRAM`, the second linked with C++ mangling because the extern was
+  not `extern "C"`. r52 fixes both; it is the pending image for the next
+  hardware test.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

@@ -211,6 +211,18 @@
   `sched_init`, `MACH_IPC`, `PMAP_ACTIVATE_KERNEL`, `mapping_free_prime`),
   using a saved boot_args pointer for the calls without an argument.
 
+- **`serial=0` is what unlocks `kernel_bootstrap`.** With the r41 kernel and
+  only `serial=0` changed, the panel shows stages 45-55: `printf(version)`,
+  `scale_setup`, `vm_mem_bootstrap`, the OSLOG startup entries,
+  `console_init`, `stackshot_init`, `sched_init`, MACH_IPC,
+  `PMAP_ACTIVATE_KERNEL` and `mapping_free_prime` all return. The BCM2837
+  serial console (`serial=3`) is the hang: the first `kprintf` writes to a
+  UART that does not exist on SM8150. The default board args must drop
+  `serial=3`.
+- The hang is now after stage 55, in `machine_init`, `clock_init`,
+  `code_signing_init`, `task_init`/`thread_init` or
+  `kernel_thread_create`. r42 marks those as stages 56-63.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

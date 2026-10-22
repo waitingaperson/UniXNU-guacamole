@@ -1,7 +1,7 @@
 diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 --- a/osfmk/arm64/sweet_stage.c
 +++ b/osfmk/arm64/sweet_stage.c
-@@ -1,25 +1,124 @@
+@@ -1,25 +1,126 @@
  /*
   * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
   * of the boot framebuffer V=P, so these writes work from C with the MMU on
@@ -98,7 +98,7 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +	if (args == NULL) {
 +		args = sweet_stage_args;
 +	}
-+	static const uint32_t colors[96] = {
++	static const uint32_t colors[104] = {
  		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
  		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
  		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
@@ -123,15 +123,17 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +		0xffff4040u, 0xff40ff40u, 0xff4040ffu, 0xffffff40u,
 +		0xff40ffffu, 0xffff40ffu, 0xffc0c0c0u, 0xff808080u,
 +		0xff202060u, 0xffff6020u, 0xff2060ffu, 0xff60ff20u,
-+		0xffff2060u, 0xff20ff60u, 0xff6020ffu, 0xffff2060u
++		0xffff2060u, 0xff20ff60u, 0xff6020ffu, 0xffff2060u,
++		0xffa02020u, 0xff20a020u, 0xff2020a0u, 0xffa0a020u,
++		0xff20a0a0u, 0xffa020a0u, 0xffe0e0e0u, 0xff606060u
  	};
  
 -	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 95) {
++	if (args == NULL || stage > 103) {
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,19 +130,25 @@
+@@ -31,19 +132,25 @@
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
@@ -724,6 +726,60 @@ diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
  
  #if MACH_KDP
  	kernel_bootstrap_log("kdp_init");
+@@ -670,6 +711,7 @@
+ #endif
+ 
+ 	kernel_startup_initialize_upto(STARTUP_SUB_SYSCTL);
++	sweet_stage_mark(NULL, 95);
+ 
+ 	/*
+ 	 * Initialize the globals used for permuting kernel
+@@ -683,10 +725,12 @@
+ 	vm_kernel_addrperm_ext = (vm_offset_t)(early_random() | 1);
+ 	vm_kernel_addrhash_salt = early_random();
+ 	vm_kernel_addrhash_salt_ext = early_random();
++	sweet_stage_mark(NULL, 96);
+ 
+ #ifdef  IOKIT
+ 	kernel_bootstrap_log("PE_init_iokit");
+ 	PE_init_iokit();
++	sweet_stage_mark(NULL, 97);
+ #endif
+ 
+ 	assert(ml_get_interrupts_enabled() == FALSE);
+@@ -696,27 +740,32 @@
+ 	 * interrupts or preemption enabled may begin enforcement.
+ 	 */
+ 	kernel_startup_initialize_upto(STARTUP_SUB_EARLY_BOOT);
++	sweet_stage_mark(NULL, 98);
+ 
+ #if SCHED_HYGIENE_DEBUG
+ 	// Reset interrupts masked timeout before we enable interrupts
+ 	ml_spin_debug_clear_self();
+ #endif
+ 	(void) spllo();         /* Allow interruptions */
++	sweet_stage_mark(NULL, 99);
+ 
+ 	/*
+ 	 * This will start displaying progress to the user, start as early as possible
+ 	 */
+ 	initialize_screen(NULL, kPEAcquireScreen);
++	sweet_stage_mark(NULL, 100);
+ 
+ 	/*
+ 	 *	Initialize the shared region module.
+ 	 */
+ 	vm_commpage_init();
+ 	vm_commpage_text_init();
++	sweet_stage_mark(NULL, 101);
+ 
+ #if CONFIG_MACF
+ 	kernel_bootstrap_log("mac_policy_initmach");
+ 	mac_policy_initmach();
++	sweet_stage_mark(NULL, 102);
+ #if CONFIG_VNGUARD
+ 	kernel_bootstrap_log("vnguard_policy_init");
+ 	vnguard_policy_init();
 diff --git a/osfmk/kern/thread_call.c b/osfmk/kern/thread_call.c
 --- a/osfmk/kern/thread_call.c
 +++ b/osfmk/kern/thread_call.c

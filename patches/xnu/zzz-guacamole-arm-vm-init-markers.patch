@@ -61,7 +61,44 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
 --- a/osfmk/arm64/arm_vm_init.c
 +++ b/osfmk/arm64/arm_vm_init.c
-@@ -1812,6 +1812,49 @@
+@@ -1809,9 +1809,86 @@
+ 	}
+ }
+ 
++/*
++ * Guacamole: io_map() runs before kmem is available and maps the panic log,
++ * the framebuffer and the UART with pmap_map_bd_with_options(), which walks
++ * the leaf tables without allocating them. Pre-allocate the L3 tables for the
++ * early I/O window that starts at virtual_space_start.
++ */
++#define EARLY_IO_WINDOW_SIZE (64ULL * 1024 * 1024)
++
++static void
++init_ptpages_leaf(tt_entry_t *tt, vm_map_address_t start, vm_map_address_t end)
++{
++	vm_offset_t ptpage_vaddr;
++	tt_entry_t *l1_tte;
++	tt_entry_t *l2_tte;
++	vm_map_address_t va;
++
++	for (va = start; va < end; va += ARM_TT_L2_SIZE) {
++		l1_tte = tt + L1_TABLE_INDEX(va);
++		if ((*l1_tte & (ARM_TTE_VALID | ARM_TTE_TYPE_MASK)) !=
++		    (ARM_TTE_VALID | ARM_TTE_TYPE_TABLE)) {
++			continue;
++		}
++		l2_tte = (tt_entry_t *)((*l1_tte & ARM_TTE_TABLE_MASK) -
++		    gPhysBase + gVirtBase) + L2_TABLE_INDEX(va);
++		if (*l2_tte != ARM_TTE_EMPTY) {
++			continue;
++		}
++		ptpage_vaddr = alloc_ptpage(TRUE);
++		*l2_tte = (kvtophys(ptpage_vaddr) & ARM_TTE_TABLE_MASK) |
++		    ARM_TTE_TYPE_TABLE | ARM_TTE_VALID;
++		bzero((void *)ptpage_vaddr, ARM_PGBYTES);
++	}
++}
++
  #define ARM64_PHYSMAP_SLIDE_RANGE (1ULL << 30) // 1 GB
  #define ARM64_PHYSMAP_SLIDE_MASK  (ARM64_PHYSMAP_SLIDE_RANGE - 1)
  
@@ -111,7 +148,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  void
  arm_vm_init(uint64_t memory_size, boot_args * args)
  {
-@@ -1825,11 +1868,16 @@
+@@ -1825,11 +1902,16 @@
  	vm_offset_t      ptpage_vaddr;
  	vm_map_address_t dynamic_memory_begin;
  
@@ -128,7 +165,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  #if KASAN
  	real_phys_size = args->memSize + (shadow_ptop - shadow_pbase);
  #else
-@@ -1911,6 +1959,8 @@
+@@ -1911,6 +1993,8 @@
  		panic("Unsupported memory configuration %lx", mem_size);
  	}
  
@@ -137,7 +174,17 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  	boot_tte = (tt_entry_t *)&bootstrap_pagetables;
  	boot_ttep = kvtophys((vm_offset_t)boot_tte);
  
-@@ -2140,21 +2190,66 @@
+@@ -2127,6 +2211,9 @@
+ 	init_ptpages(cpu_tte, dynamic_memory_begin, VM_MAX_KERNEL_ADDRESS, TRUE, ARM_DYNAMIC_TABLE_XN | ARM_TTE_TABLE_AP(ARM_TTE_TABLE_AP_USER_NA));
+ #endif
+ 
++	init_ptpages_leaf(cpu_tte, dynamic_memory_begin,
++	    dynamic_memory_begin + EARLY_IO_WINDOW_SIZE);
++
+ #if KASAN
+ 	/* record the extent of the physmap */
+ 	physmap_vbase = physmap_base;
+@@ -2140,21 +2227,66 @@
  
  	arm_set_user_tbi();
  
@@ -206,7 +253,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  	// From here on out, we're off the bootstrap translation tables.
  
  
-@@ -2248,6 +2343,8 @@
+@@ -2248,6 +2380,8 @@
  #endif
  	pmap_bootstrap(dynamic_memory_begin);
  
@@ -215,7 +262,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  	disable_preemption();
  
  	/*
-@@ -2298,6 +2395,8 @@
+@@ -2298,6 +2432,8 @@
  		cpu_l1_tte++;
  	}
  

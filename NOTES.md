@@ -40,6 +40,30 @@
 - Local UniXNU, DarwinBoot and Aloha changes are exported as
   `patches/*.patch`; the external trees remain ignored.
 
+## 2026-10-22: UniXNU-built xnu-8796 kernel (branch `kernel-8796`)
+
+- **The kernel now builds with UniXNU's method, not from the ios-sweet blob.**
+  `xnu-8796.141.3` (the last open-source tag matching the iPhone X 16.7.16
+  generation) is built as a 4 KiB `BCM2837` kernel with
+  `ArmDTPlatform` + `ArmCpu`, source corecrypto, and a real libpthread
+  component. CI run `39702265755`, job `119574041206`.
+- The kernel is `out/guacamole/kernel/kernel-8796.macho`, 15,228,600 bytes,
+  sha256 `8a941583...`. It is linked and crypto-sealed; `unixnu` stops only at
+  `board.toml has no [kernel.prelink]`, which is deliberate for this milestone.
+- Build inputs are pinned in `feeds.toml`/`unixnu.lock`: XNU
+  `1b191cb` (`xnu-8796.141.3`), libpthread `a6c70ca`
+  (`libpthread-514.100.2`), libplatform/libdispatch/AvailabilityVersions as
+  listed, and corecrypto-2023 `11fba65`.
+- `configs/guacamole_8796_defconfig` is the first-stage config: no storage,
+  display or GPU. `patches/xnu` is a 24-patch 8796 series; 19 were taken from
+  UniXNU after `git apply --check`, and the rest are the 8796-specific fixes:
+  rebased `source-machine-layer` and `apple-only-cpu-tunables`, the kpc stub,
+  `CFLAGS_EXTRA`, clang `-MJ` compile records, iOS 16 deployment, and the
+  libpthread 514 builder.
+- The previous 16 KiB r15 chain remains the known-good boot path. This 4 KiB
+  kernel is not yet booted; it still needs `NativeUfs`, a display/console
+  provider, and a prelink against the iPhone X 16.7.16 kernelcache.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

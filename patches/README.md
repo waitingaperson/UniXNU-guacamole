@@ -58,6 +58,23 @@ checkout.
   guacamole NOSB build.
 - `Resources/`: guacamole boot-image configuration and `mkbootimg.py`.
 
+## Kernel-8796 patch series
+
+`patches/xnu/` is the device override for UniXNU's XNU module. It targets
+`xnu-8796.141.3` and replaces UniXNU's iOS 17 patch set. The current 24
+patches cover:
+
+- the 4 KiB machine config, source corecrypto/pthread, ArmDTPlatform and
+  ArmCpu base (`native-4k-*`, `source-*`, `non-apple-*`);
+- 8796 build compatibility: `source-machine-layer`,
+  `apple-only-cpu-tunables`, the non-Apple `kpc.c` stub, `CFLAGS_EXTRA`,
+  clang `-MJ` compile records, and the new-clang/UIO backports;
+- iOS 16 deployment and the libpthread 514 source builder in `scripts/`.
+
+The series applies cleanly to a fresh `xnu-8796.141.3` worktree. The kernel
+currently builds and seals; storage/display drivers and `[kernel.prelink]` are
+the next porting stages.
+
 ## Refresh
 
 After changing an external tree:

@@ -27,6 +27,22 @@ Hardware-verified on a GM1910 with `fastboot boot` (no partition was written):
 
 The GPU/GMU bring-up is a kernel-side blocker and is tracked in `ios-sweet`.
 
+## Kernel build (branch `kernel-8796`)
+
+The `kernel-8796` branch replaces the copied ios-sweet kernel with a UniXNU
+build of `xnu-8796.141.3`:
+
+- 4 KiB `BCM2837` machine config, `ArmDTPlatform`, `ArmCpu`, source
+  corecrypto and libpthread 514;
+- device-specific `feeds.toml`, `unixnu.lock`, `configs/guacamole_8796_defconfig`
+  and a 24-patch `patches/xnu/` series;
+- macOS workflow `kernel-8796` builds and seals
+  `out/guacamole/kernel/kernel-8796.macho`.
+
+The kernel currently builds, but storage/display drivers and
+`[kernel.prelink]` are still to be ported. The r15 16 KiB chain remains the
+known-good fallback.
+
 ## Layout
 
 ```

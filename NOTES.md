@@ -125,6 +125,39 @@
   The next discriminator is therefore the hardware marker, not more static
   analysis.
 
+## 2026-10-22: 900E RAM reads locate the stop after arm_vm_init
+
+- **The 900E Sahara memory-debug interface allows arbitrary physical reads.**
+  `qdl ramdump` (linux-msm/qdl) collects the SBL crash dump; with a local
+  patch (`QDL_MEM_READ=addr:len:path`) the same session reads any address.
+  Reading `0x181004000` returns the kernel Mach-O header, so the crashed
+  kernel's RAM is intact and inspectable without the panel.
+- The dump itself is the SBL/AOP crash dump, not kernel RAM: `KMSG.txt` is
+  empty, and the offered regions are OCIMEM/CODERAM/PIMEM/PMIC state. The
+  useful read is the arbitrary one.
+- **The 4K TTBR1 switch works.** In RAM: `kva_active = 1`,
+  `cpu_ttep = 0x182381000`, `cpu_tte = 0xfffffff030781000`,
+  `invalid_tte = 0xfffffff030780000`. Walking the live tables: L1[0xc0]
+  points at `0x182382000`, L2[0x39] at `0x182387000`, and the PTE for
+  `arm_vm_init` is `0x500001813eb683` (valid, AF, EL1-executable, correct
+  PA). The boot stack pages are valid and writable. The r36 stage 25 was a
+  false positive: the checker used `phystokv()` after `ptov_table` was
+  filled, so it read the slid aperture instead of the bootstrap linear map.
+- **The framebuffer in RAM shows the real markers.** Reading 2 MiB at
+  `0x9c000000` and matching the stage colors shows 8, 1, 2, 5, 6, 7, 12,
+  13, 14, 15, 16, 17, 18, 19, 20, 21, 22, plus the false 25. So
+  `arm_vm_init` returns and `arm_init` reaches stage 16.
+- **The kernel stops right after the serial boot-arg block.** The kernel log
+  buffer (in `__DATA`, found at PA `0x181b05e0c`) ends at
+  `[  250.679843]: Serial mode specified: 00000003`, and a boot with
+  `serial=0` ends at the same line with `00000000`. `switch_to_serial_console`
+  is therefore not the fault; the next calls are `PE_create_console()`
+  (`check_for_panic_log` + `PE_initialize_console`) and `PE_init_printf`.
+- r37 marks those calls: stage 28 after `PE_consistent_debug_inherit`, 29
+  after `serial_init`, 30 after `kernel_startup_initialize_upto`, 31 after
+  the serial block, 32 after `PE_create_console`, 33 after
+  `PE_init_printf`. Stages 28-35 draw at y=220+((stage-28)&7)*20, x=300.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

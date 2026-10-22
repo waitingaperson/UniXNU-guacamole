@@ -1,7 +1,7 @@
 diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 --- a/osfmk/arm64/sweet_stage.c
 +++ b/osfmk/arm64/sweet_stage.c
-@@ -1,25 +1,130 @@
+@@ -1,25 +1,132 @@
  /*
   * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
   * of the boot framebuffer V=P, so these writes work from C with the MMU on
@@ -98,7 +98,7 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +	if (args == NULL) {
 +		args = sweet_stage_args;
 +	}
-+	static const uint32_t colors[120] = {
++	static const uint32_t colors[128] = {
  		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
  		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
  		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
@@ -129,15 +129,17 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +		0xffc04040u, 0xff40c040u, 0xff4040c0u, 0xffc0c040u,
 +		0xff40c0c0u, 0xffc040c0u, 0xffffe0e0u, 0xff404040u,
 +		0xffffff00u, 0xff00ffffu, 0xffff00ffu, 0xff00ff00u,
-+		0xffff0000u, 0xff0000ffu, 0xff808080u, 0xffc0c0c0u
++		0xffff0000u, 0xff0000ffu, 0xff808080u, 0xffc0c0c0u,
++		0xff800000u, 0xff008000u, 0xff000080u, 0xff808000u,
++		0xff008080u, 0xff800080u, 0xff404040u, 0xffffffffu
  	};
  
 -	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 119) {
++	if (args == NULL || stage > 127) {
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,19 +136,25 @@
+@@ -31,19 +138,25 @@
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
@@ -937,4 +939,45 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
 +	sweet_stage_mark(NULL, 115);
  	options->release();
  }
+ 
+@@ -2176,15 +2184,19 @@
+ 	uuid_string_t     uuid;
+ 
+ #if !defined(__x86_64__)
++	sweet_stage_mark(NULL, 116);
+ 	entry = IORegistryEntry::fromPath( "/chosen", gIODTPlane );
++	sweet_stage_mark(NULL, 117);
+ 	if (entry) {
+ 		OSData * data1;
+ 
+ 		data1 = OSDynamicCast( OSData, entry->getProperty( "unique-chip-id" ));
++		sweet_stage_mark(NULL, 118);
+ 		if (data1 && data1->getLength() == 8) {
+ 			OSData * data2;
+ 
+ 			data2 = OSDynamicCast( OSData, entry->getProperty( "chip-id" ));
++			sweet_stage_mark(NULL, 119);
+ 			if (data2 && data2->getLength() == 4) {
+ 				SHA1_CTX     context;
+ 				uint8_t      digest[SHA_DIGEST_LENGTH];
+@@ -2195,17 +2207,20 @@
+ 				SHA1Update( &context, data1->getBytesNoCopy(), data1->getLength());
+ 				SHA1Update( &context, data2->getBytesNoCopy(), data2->getLength());
+ 				SHA1Final( digest, &context );
++				sweet_stage_mark(NULL, 120);
+ 
+ 				digest[6] = (digest[6] & 0x0F) | 0x50;
+ 				digest[8] = (digest[8] & 0x3F) | 0x80;
+ 
+ 				uuid_unparse( digest, uuid );
+ 				string = OSString::withCString( uuid );
++				sweet_stage_mark(NULL, 121);
+ 			}
+ 		}
+ 
+ 		entry->release();
+ 	}
++	sweet_stage_mark(NULL, 122);
+ #else /* !defined(__x86_64__) */
+ 	OSData * data;
  

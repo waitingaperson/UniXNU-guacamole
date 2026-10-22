@@ -1,7 +1,7 @@
 diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 --- a/osfmk/arm64/sweet_stage.c
 +++ b/osfmk/arm64/sweet_stage.c
-@@ -1,25 +1,56 @@
+@@ -1,25 +1,124 @@
  /*
   * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
   * of the boot framebuffer V=P, so these writes work from C with the MMU on
@@ -25,6 +25,72 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +	sweet_stage_args = args;
 +}
 +
++
++/* 5x7 digits, drawn at 10x so the last stage is readable in a photo. */
++static const uint8_t sweet_digits[10][7] = {
++	{ 0x0e, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0e },
++	{ 0x04, 0x0c, 0x04, 0x04, 0x04, 0x04, 0x0e },
++	{ 0x0e, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1f },
++	{ 0x1f, 0x02, 0x04, 0x02, 0x01, 0x11, 0x0e },
++	{ 0x02, 0x06, 0x0a, 0x12, 0x1f, 0x02, 0x02 },
++	{ 0x1f, 0x10, 0x1e, 0x01, 0x01, 0x11, 0x0e },
++	{ 0x06, 0x08, 0x10, 0x1e, 0x11, 0x11, 0x0e },
++	{ 0x1f, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08 },
++	{ 0x0e, 0x11, 0x11, 0x0e, 0x11, 0x11, 0x0e },
++	{ 0x0e, 0x11, 0x11, 0x0f, 0x01, 0x02, 0x0c },
++};
++
++static void
++sweet_stage_number(boot_args *args, unsigned int stage)
++{
++	uint64_t base = args->Video.v_baseAddr;
++	uint32_t stride = (uint32_t)args->Video.v_rowBytes;
++	const uint32_t scale = 10;
++	const uint32_t ox = 16, oy = 16;
++	uint32_t digits[3];
++	unsigned int n = 0, v = stage;
++
++	if (base == 0 || stride < 4) {
++		return;
++	}
++	volatile uint32_t *fb = (volatile uint32_t *)(uintptr_t)base;
++
++	for (uint32_t y = 0; y < 8 * scale; y++) {
++		volatile uint32_t *line = fb + (uint64_t)(oy + y) * (stride / 4u);
++		for (uint32_t x = 0; x < 3 * 6 * scale; x++) {
++			line[ox + x] = 0;
++		}
++	}
++
++	if (v == 0) {
++		digits[n++] = 0;
++	}
++	while (v != 0 && n < 3) {
++		digits[n++] = v % 10;
++		v /= 10;
++	}
++
++	for (unsigned int i = 0; i < n; i++) {
++		unsigned int d = digits[n - 1 - i];
++		uint32_t dx = ox + i * 6 * scale;
++		for (unsigned int row = 0; row < 7; row++) {
++			uint8_t bits = sweet_digits[d][row];
++			for (unsigned int col = 0; col < 5; col++) {
++				if ((bits & (1u << (4 - col))) == 0) {
++					continue;
++				}
++				for (uint32_t sy = 0; sy < scale; sy++) {
++					volatile uint32_t *line = fb + (uint64_t)(oy + row * scale + sy) * (stride / 4u);
++					for (uint32_t sx = 0; sx < scale; sx++) {
++						line[dx + col * scale + sx] = 0xffffffffu;
++					}
++				}
++			}
++		}
++	}
++	__asm__ volatile ("dsb sy" ::: "memory");
++}
++
  void
  sweet_stage_mark(boot_args *args, unsigned int stage)
  {
@@ -32,7 +98,7 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +	if (args == NULL) {
 +		args = sweet_stage_args;
 +	}
-+	static const uint32_t colors[88] = {
++	static const uint32_t colors[96] = {
  		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
  		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
  		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
@@ -55,15 +121,17 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +		0xff202020u, 0xffff8000u, 0xff0080ffu, 0xff80ff00u,
 +		0xffff0080u, 0xff00ff80u, 0xff8000ffu, 0xff00ffffu,
 +		0xffff4040u, 0xff40ff40u, 0xff4040ffu, 0xffffff40u,
-+		0xff40ffffu, 0xffff40ffu, 0xffc0c0c0u, 0xff808080u
++		0xff40ffffu, 0xffff40ffu, 0xffc0c0c0u, 0xff808080u,
++		0xff202060u, 0xffff6020u, 0xff2060ffu, 0xff60ff20u,
++		0xffff2060u, 0xff20ff60u, 0xff6020ffu, 0xffff2060u
  	};
  
 -	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 87) {
++	if (args == NULL || stage > 95) {
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,14 +62,18 @@
+@@ -31,19 +130,24 @@
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
@@ -85,6 +153,12 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
  	for (uint32_t row = 0; row < 4; row++) {
  		volatile uint32_t *line = fb + (uint64_t)(y + row) * (stride / 4u);
  		for (uint32_t col = x; col < x + 128u; col++) {
+ 			line[col] = colors[stage];
+ 		}
+ 	}
++	sweet_stage_number(args, stage);
+ 	__asm__ volatile ("dsb sy" ::: "memory");
+ }
 diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
 --- a/osfmk/arm64/arm_vm_init.c
 +++ b/osfmk/arm64/arm_vm_init.c
@@ -649,3 +723,75 @@ diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
  
  #if MACH_KDP
  	kernel_bootstrap_log("kdp_init");
+diff --git a/osfmk/kern/thread_call.c b/osfmk/kern/thread_call.c
+--- a/osfmk/kern/thread_call.c
++++ b/osfmk/kern/thread_call.c
+@@ -528,6 +528,8 @@
+ static void
+ thread_call_initialize(void)
+ {
++	extern void sweet_stage_mark(boot_args *args, unsigned int stage);
++	sweet_stage_mark(NULL, 87);
+ 	nanotime_to_absolutetime(0, THREAD_CALL_DEALLOC_INTERVAL_NS, &thread_call_dealloc_interval_abs);
+ 	waitq_init(&daemon_waitq, WQT_QUEUE, SYNC_POLICY_FIFO);
+ 
+@@ -547,6 +549,7 @@
+ 	}
+ 
+ 	thread_deallocate(thread);
++	sweet_stage_mark(NULL, 88);
+ }
+ STARTUP(THREAD_CALL, STARTUP_RANK_FIRST, thread_call_initialize);
+ 
+diff --git a/osfmk/ipc/ipc_importance.c b/osfmk/ipc/ipc_importance.c
+--- a/osfmk/ipc/ipc_importance.c
++++ b/osfmk/ipc/ipc_importance.c
+@@ -3807,6 +3807,8 @@
+ static void
+ ipc_importance_thread_call_init(void)
+ {
++	extern void sweet_stage_mark(boot_args *args, unsigned int stage);
++	sweet_stage_mark(NULL, 89);
+ 	/* initialize delayed drop queue and thread-call */
+ 	queue_init(&ipc_importance_delayed_drop_queue);
+ 	ipc_importance_delayed_drop_call =
+@@ -3814,6 +3816,7 @@
+ 	if (NULL == ipc_importance_delayed_drop_call) {
+ 		panic("ipc_importance_init");
+ 	}
++	sweet_stage_mark(NULL, 90);
+ }
+ STARTUP(THREAD_CALL, STARTUP_RANK_MIDDLE, ipc_importance_thread_call_init);
+ 
+diff --git a/osfmk/kern/work_interval.c b/osfmk/kern/work_interval.c
+--- a/osfmk/kern/work_interval.c
++++ b/osfmk/kern/work_interval.c
+@@ -488,6 +488,8 @@
+ static void
+ work_interval_subsystem_init(void)
+ {
++	extern void sweet_stage_mark(boot_args *args, unsigned int stage);
++	sweet_stage_mark(NULL, 91);
+ 	/*
+ 	 * The work interval deallocation queue must be a thread call based queue
+ 	 * because it is woken up from contexts where the thread lock is held. The
+@@ -498,6 +500,7 @@
+ 	mpsc_daemon_queue_init_with_thread_call(&work_interval_deallocate_queue,
+ 	    work_interval_deallocate_queue_invoke, THREAD_CALL_PRIORITY_KERNEL,
+ 	    MPSC_DAEMON_INIT_NONE);
++	sweet_stage_mark(NULL, 92);
+ }
+ STARTUP(THREAD_CALL, STARTUP_RANK_MIDDLE, work_interval_subsystem_init);
+ #endif /* CONFIG_SCHED_AUTO_JOIN */
+diff --git a/osfmk/vm/analytics.c b/osfmk/vm/analytics.c
+--- a/osfmk/vm/analytics.c
++++ b/osfmk/vm/analytics.c
+@@ -230,6 +230,8 @@
+ static void
+ vm_analytics_init()
+ {
++	extern void sweet_stage_mark(boot_args *args, unsigned int stage);
++	sweet_stage_mark(NULL, 93);
+ 	vm_analytics_thread_call = thread_call_allocate_with_options(vm_analytics_tick, NULL, THREAD_CALL_PRIORITY_KERNEL, THREAD_CALL_OPTIONS_ONCE);
+ 	schedule_analytics_thread_call();
+ }

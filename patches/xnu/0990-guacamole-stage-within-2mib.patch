@@ -1,0 +1,20 @@
+--- a/osfmk/arm64/sweet_stage.c	2026-10-22 12:19:02.297266028 +0800
++++ b/osfmk/arm64/sweet_stage.c	2026-10-22 12:19:02.312659454 +0800
+@@ -29,7 +29,7 @@
+ 	}
+ 	volatile uint32_t *fb = (volatile uint32_t *)(uintptr_t)base;
+ 	if (stage == 0) {
+-		for (uint32_t row = 0; row < 160; row++) {
++		for (uint32_t row = 0; row < 144; row++) {
+ 			volatile uint32_t *line = fb + (uint64_t)(340u + row) * (stride / 4u);
+ 			for (uint32_t col = 300; col < 628; col++) {
+ 				line[col] = 0;
+@@ -39,7 +39,7 @@
+ 	}
+ 	uint32_t y = 340u + (stage & 7u) * 20u;
+ 	uint32_t x = 300u;
+-	for (uint32_t row = 0; row < 16; row++) {
++	for (uint32_t row = 0; row < 4; row++) {
+ 		volatile uint32_t *line = fb + (uint64_t)(y + row) * (stride / 4u);
+ 		for (uint32_t col = x; col < x + 128u; col++) {
+ 			line[col] = colors[stage];

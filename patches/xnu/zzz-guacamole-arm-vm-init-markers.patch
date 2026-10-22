@@ -1,7 +1,7 @@
 diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 --- a/osfmk/arm64/sweet_stage.c
 +++ b/osfmk/arm64/sweet_stage.c
-@@ -1,8 +1,10 @@
+@@ -1,25 +1,48 @@
  /*
   * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
   * of the boot framebuffer V=P, so these writes work from C with the MMU on
@@ -14,12 +14,25 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
   * arm_vm_init tears down the bootstrap TTBR0.
   */
  #include <pexpert/pexpert.h>
-@@ -12,14 +14,22 @@
+ #include <pexpert/arm64/boot.h>
+ #include <stdint.h>
+ 
++static boot_args *sweet_stage_args;
++
  void
++sweet_stage_set_args(boot_args *args)
++{
++	sweet_stage_args = args;
++}
++
++void
  sweet_stage_mark(boot_args *args, unsigned int stage)
  {
 -	static const uint32_t colors[16] = {
-+	static const uint32_t colors[48] = {
++	if (args == NULL) {
++		args = sweet_stage_args;
++	}
++	static const uint32_t colors[56] = {
  		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
  		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
  		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
@@ -32,15 +45,17 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +		0xff8080ffu, 0xffff8080u, 0xff80ffffu, 0xffffff80u,
 +		0xff20ff80u, 0xffff2080u, 0xff80ff20u, 0xff2080ffu,
 +		0xffff8020u, 0xff20ffffu, 0xffff20ffu, 0xff80ffffu,
-+		0xff40ff80u, 0xffff4080u, 0xff80ff40u, 0xff4080ffu
++		0xff40ff80u, 0xffff4080u, 0xff80ff40u, 0xff4080ffu,
++		0xffffc040u, 0xff40c0ffu, 0xffc0ff40u, 0xffff40c0u,
++		0xff40ffc0u, 0xffc040ffu, 0xffffc0c0u, 0xffc0c0ffu
  	};
  
 -	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 47) {
++	if (args == NULL || stage > 55) {
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,14 +41,17 @@
+@@ -31,14 +54,17 @@
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
@@ -277,7 +292,16 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
 diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
 --- a/osfmk/arm/arm_init.c
 +++ b/osfmk/arm/arm_init.c
-@@ -537,6 +537,7 @@
+@@ -347,6 +347,8 @@
+ 	DTEntry chosen = NULL;
+ 	unsigned int dt_entry_size = 0;
+ 
++	extern void sweet_stage_set_args(boot_args *args);
++	sweet_stage_set_args(args);
+ 	sweet_stage_mark(args, 0);
+ 	arm_setup_pre_sign();
+ 	sweet_stage_mark(args, 8);
+@@ -537,6 +539,7 @@
  
  	sweet_stage_mark(args, 7);
  	arm_vm_init(xmaxmem, args);
@@ -285,7 +309,7 @@ diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
  
  	if (debug_boot_arg) {
  		patch_low_glo();
-@@ -547,10 +548,13 @@
+@@ -547,10 +550,13 @@
  #endif
  
  	PE_consistent_debug_inherit();
@@ -299,7 +323,7 @@ diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
  	kprintf("kprintf initialized\n");
  
  	serialmode = 0;
-@@ -584,6 +588,7 @@
+@@ -584,6 +590,7 @@
  	if (kern_feature_override(KF_SERIAL_OVRD)) {
  		serialmode = 0;
  	}
@@ -307,7 +331,7 @@ diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
  
  	/* Start serial if requested and a serial device was enumerated in serial_init(). */
  	if ((serialmode & SERIALMODE_OUTPUT) && serial_exists) {
-@@ -592,9 +597,11 @@
+@@ -592,9 +599,11 @@
  		disableConsoleOutput = FALSE;     /* Allow printfs to happen */
  	}
  	PE_create_console();
@@ -319,7 +343,7 @@ diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
  
  #if __arm64__
  #if DEBUG
-@@ -603,8 +610,10 @@
+@@ -603,8 +612,10 @@
  #endif
  
  	cpu_machine_idle_init(TRUE);
@@ -330,7 +354,7 @@ diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
  
  #if __arm64__
  	extern bool cpu_config_correct;
-@@ -613,6 +622,7 @@
+@@ -613,6 +624,7 @@
  	}
  
  	ml_map_cpu_pio();
@@ -338,7 +362,7 @@ diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
  
  #if APPLE_ARM64_ARCH_FAMILY
  	configure_late_apple_regs();
-@@ -621,6 +631,7 @@
+@@ -621,6 +633,7 @@
  #endif
  
  	cpu_timebase_init(TRUE);
@@ -346,7 +370,7 @@ diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
  
  #if KPERF
  	/* kptimer_curcpu_up() must be called after cpu_timebase_init */
-@@ -628,7 +639,9 @@
+@@ -628,7 +641,9 @@
  #endif /* KPERF */
  
  	PE_init_cpu();
@@ -356,7 +380,7 @@ diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
  
  
  #if HIBERNATION
-@@ -654,9 +667,11 @@
+@@ -654,9 +669,11 @@
  	if (SecureDTGetProperty(chosen, "dram-size", (void const **)&dram_size, &dt_entry_size) != kSuccess) {
  		panic("%s: Unable to find 'dram-size' entry in the 'chosen' DT node", __FUNCTION__);
  	}
@@ -368,7 +392,7 @@ diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
  
  	/*
  	 * Initialize the stack protector for all future calls
-@@ -670,6 +685,7 @@
+@@ -670,6 +687,7 @@
  	 * against string vulnerabilities
  	 */
  	__stack_chk_guard &= ~(0xFFULL << 8);
@@ -397,3 +421,73 @@ diff --git a/osfmk/arm64/machine_routines.c b/osfmk/arm64/machine_routines.c
  
  
  	/*
+diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
+--- a/osfmk/kern/startup.c
++++ b/osfmk/kern/startup.c
+@@ -422,16 +422,22 @@
+ void
+ kernel_bootstrap(void)
+ {
++	extern void sweet_stage_mark(boot_args *args, unsigned int stage);
+ 	kern_return_t   result;
+ 	thread_t        thread;
+ 	char            namep[16];
+ 
++	sweet_stage_mark(NULL, 45);
++
+ 	printf("%s\n", version); /* log kernel version */
++	sweet_stage_mark(NULL, 46);
+ 
+ 	scale_setup();
++	sweet_stage_mark(NULL, 47);
+ 
+ 	kernel_bootstrap_log("vm_mem_bootstrap");
+ 	vm_mem_bootstrap();
++	sweet_stage_mark(NULL, 48);
+ 
+ 	machine_info.memory_size = (uint32_t)mem_size;
+ #if XNU_TARGET_OS_OSX
+@@ -448,6 +454,7 @@
+ 	atm_init();
+ #endif
+ 	kernel_startup_initialize_upto(STARTUP_SUB_OSLOG);
++	sweet_stage_mark(NULL, 49);
+ 
+ #if CONFIG_UBSAN_MINIMAL
+ 	kernel_bootstrap_log("UBSan minimal runtime init");
+@@ -476,12 +483,15 @@
+ 
+ 	kernel_bootstrap_log("console_init");
+ 	console_init();
++	sweet_stage_mark(NULL, 50);
+ 
+ 	kernel_bootstrap_log("stackshot_init");
+ 	stackshot_init();
++	sweet_stage_mark(NULL, 51);
+ 
+ 	kernel_bootstrap_log("sched_init");
+ 	sched_init();
++	sweet_stage_mark(NULL, 52);
+ 
+ #if CONFIG_MACF
+ 	kernel_bootstrap_log("mac_policy_init");
+@@ -489,6 +499,7 @@
+ #endif
+ 
+ 	kernel_startup_initialize_upto(STARTUP_SUB_MACH_IPC);
++	sweet_stage_mark(NULL, 53);
+ 
+ 	/*
+ 	 * As soon as the virtual memory system is up, we record
+@@ -496,9 +507,11 @@
+ 	 */
+ 	kernel_bootstrap_log("PMAP_ACTIVATE_KERNEL");
+ 	PMAP_ACTIVATE_KERNEL(master_cpu);
++	sweet_stage_mark(NULL, 54);
+ 
+ 	kernel_bootstrap_log("mapping_free_prime");
+ 	mapping_free_prime();                                           /* Load up with temporary mapping blocks */
++	sweet_stage_mark(NULL, 55);
+ 
+ 	kernel_bootstrap_log("machine_init");
+ 	machine_init();

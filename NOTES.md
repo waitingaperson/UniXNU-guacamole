@@ -178,6 +178,18 @@
   `CONFIG_XNU_DT_PANIC_REGION=y` so the platform panic-log address is not
   used.
 
+- **r38 gets through `PE_create_console()`.** With the DT panic-region path
+  and the pre-allocated leaf tables, the panel shows stages 28, 29, 30, 31,
+  32 and 33; `PE_init_printf` returns and `kprintf` now has a console.
+  The kernel no longer resets: it **hangs after stage 33**, in the startup
+  steps that follow (`cpu_machine_idle_init`, `PE_init_platform`,
+  `ml_map_cpu_pio`, `cpu_timebase_init`, `PE_init_cpu`,
+  `fiq_context_init`, the `dram-base`/`dram-size` lookups).
+- r39 marks those calls as stages 34-40 (x=300 for 34/35, x=500 for 36-40,
+  y=220+((stage-28)&7)*20). The 900E arbitrary read of physical
+  `0x3c0fc000` returns no data, which confirms the BCM2837 panic-log address
+  is not backed by memory on SM8150.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

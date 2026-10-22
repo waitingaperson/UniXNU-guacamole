@@ -1,7 +1,7 @@
 diff --git a/makedefs/MakeInc.def b/makedefs/MakeInc.def
 --- a/makedefs/MakeInc.def
 +++ b/makedefs/MakeInc.def
-@@ -929,7 +929,6 @@
+@@ -930,7 +930,6 @@
  MIGKSFLAGS = \
  	-DMACH_KERNEL_PRIVATE \
  	-DKERNEL_SERVER=1 \
@@ -12,11 +12,14 @@ diff --git a/makedefs/MakeInc.def b/makedefs/MakeInc.def
 diff --git a/iokit/DriverKit/OSObject.iig b/iokit/DriverKit/OSObject.iig
 --- a/iokit/DriverKit/OSObject.iig
 +++ b/iokit/DriverKit/OSObject.iig
-@@ -29,6 +29,7 @@
- #if !__IIG
- #if KERNEL
- #include <libkern/c++/OSObject.h>
+@@ -32,6 +32,10 @@
+ #endif
+ #endif
+ 
++#if KERNEL
 +#include <IOKit/IORPC.h>
- #endif
- #endif
++#endif
++
+ #ifndef _IOKIT_UOSOBJECT_H
+ #define _IOKIT_UOSOBJECT_H
  

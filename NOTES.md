@@ -60,9 +60,23 @@
   rebased `source-machine-layer` and `apple-only-cpu-tunables`, the kpc stub,
   `CFLAGS_EXTRA`, clang `-MJ` compile records, iOS 16 deployment, and the
   libpthread 514 builder.
-- The previous 16 KiB r15 chain remains the known-good boot path. This 4 KiB
-  kernel is not yet booted; it still needs `NativeUfs`, a display/console
-  provider, and a prelink against the iPhone X 16.7.16 kernelcache.
+- **Prelink now works against the iPhone X kernelcache.** With
+  `out/ipsw/kernelcache.arm64` (sha256 `2ec297...`) and roots
+  `AppleARMPlatform`, `AppleARMWatchdogTimer`, `hfs.kext`,
+  `IOHIDFamily`, `IOReportFamily`, `IOStorageFamily`, the native kernel
+  prelinks to `unixnu/out/guacamole/kernel/kernel.macho` (51 MiB,
+  sha256 `710522bc...`). The planner resolves AMFI, PMGR, CoreTrust,
+  AppleImage4, corecrypto, HFS, storage and HID dependencies.
+  `slide=-0x1000000`, matching the sheng-qualified kernelcache base.
+- **NativeUfs is not portable as-is.** It matches
+  `qcom,sm8550-ufshc` and uses sheng's GCC/UFS windows, so it cannot bind
+  guacamole's SM8150 controller. The ios-sweet UFS driver is the current
+  SM8150 reference; either port it to the 4K kernel or extend NativeUfs with
+  guacamole's GCC/UFS/SMMU addresses. The display side has the same issue:
+  sheng's Legacy display builder is A740/sheng-specific.
+- The previous 16 KiB r15 chain remains the known-good boot path. The 4 KiB
+  kernel is built and prelinked, but not yet booted; storage and display are
+  the next porting blockers.
 
 ## 2026-10-21: project split
 

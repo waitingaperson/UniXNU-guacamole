@@ -106,6 +106,15 @@
   `643c5cbb...`, payload `0a2e0d5b...`. It adds stage 21 after the TTBR1
   switch and stage 22 after the TTBR0/flush, to separate a bad `cpu_tte`
   from the low-VA marker path.
+- **r36 adds a pre-switch page-table walk.** `guac_kva_exec_status()` walks
+  `cpu_tte` for `arm_vm_init` and `sweet_stage_mark` and draws stage 24 (L1
+  entry), 25 (L2 entry), 26 (L3 entry) or 27 (PXN) at x=1100 before the
+  switch; no marker means the code that runs right after `msr TTBR1_EL1` is
+  mapped executable. The same kernel also takes `guacboot1=1`, which keeps
+  the bootstrap KVA root in TTBR1 as a control. CI run `39785844497`.
+  - kernel `aebafc39...`, 15,298,200 bytes;
+  - `boot-32-r36.img` sha256 `907f779a...`, payload `875214bc...`;
+  - control `boot-32-r36b.img` sha256 `ebe9d9c8...`, payload `04cd73eb...`.
 
 ## 2026-10-21: project split
 

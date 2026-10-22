@@ -90,7 +90,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  	boot_tte = (tt_entry_t *)&bootstrap_pagetables;
  	boot_ttep = kvtophys((vm_offset_t)boot_tte);
  
-@@ -2140,14 +2149,34 @@
+@@ -2140,21 +2149,38 @@
  
  	arm_set_user_tbi();
  
@@ -102,21 +102,13 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
 +
  	set_mmu_ttb_alternate(cpu_ttep & TTBR_BADDR_MASK);
  
++	sweet_stage_mark(args, 21);
++
  #if XNU_MONITOR
  	ml_enable_monitor();
  #endif
  
 -	set_mmu_ttb(invalid_ttep & TTBR_BADDR_MASK);
-+	/*
-+	 * Guacamole: keep the 2 MiB framebuffer V=P mapping alive in TTBR0
-+	 * after the bootstrap switch so the bring-up markers remain visible.
-+	 * The L1 entry points at the bootstrap L2 table, which stays resident.
-+	 */
-+	{
-+		uint64_t fb_index = (args->Video.v_baseAddr >> ARM_TT_L1_SHIFT) & ARM_TT_L1_INDEX_MASK;
-+		invalid_tte[fb_index] = boot_tte[fb_index];
-+	}
-+
 +	/*
 +	 * Guacamole debug: keep the bootstrap TTBR0 root (which has the
 +	 * framebuffer V=P entry) instead of the empty invalid table, so the
@@ -125,8 +117,11 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
 +	set_mmu_ttb(boot_ttep & TTBR_BADDR_MASK);
  
  	flush_mmu_tlb();
++
++	sweet_stage_mark(args, 22);
++
  	kva_active = TRUE;
-@@ -2155,6 +2184,8 @@
+ 	// global table pointers may need to be different due to physical aperture remapping
  	cpu_tte = (tt_entry_t*)(phystokv(cpu_ttep));
  	invalid_tte = (tt_entry_t*)(phystokv(invalid_ttep));
  
@@ -135,7 +130,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  	// From here on out, we're off the bootstrap translation tables.
  
  
-@@ -2248,6 +2279,8 @@
+@@ -2248,6 +2274,8 @@
  #endif
  	pmap_bootstrap(dynamic_memory_begin);
  
@@ -144,7 +139,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  	disable_preemption();
  
  	/*
-@@ -2298,6 +2331,8 @@
+@@ -2298,6 +2326,8 @@
  		cpu_l1_tte++;
  	}
  

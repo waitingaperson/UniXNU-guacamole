@@ -311,6 +311,18 @@
   `OSString::withCString`.
 - r54 marks those as stages 116-122.
 
+- **r54 stops at stage 119, inside SHA1.** The digit shows 119 (after the
+  `chip-id` read, before `SHA1Final`). The kernel's SHA1 is
+  `libkern/crypto/corecrypto_sha1.c`, which dereferences
+  `g_crypto_funcs`; the source-corecrypto bootstrap registers that table
+  from a `STARTUP(EARLY_BOOT)` entry, i.e. **after**
+  `PE_init_iokit()`. `g_crypto_funcs` is still NULL there, so the SHA1
+  call faults into a panic spin and the digit stays at 119.
+- r55 moves `source_corecrypto14_bootstrap` to
+  `STARTUP(SYSCTL, STARTUP_RANK_LAST)`: after the sysctl MIB init (so its
+  `sysctl_register_oid` calls work) and before `PE_init_iokit` (so the
+  platform UUID SHA1 has a registered crypto table).
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

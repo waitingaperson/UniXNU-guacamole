@@ -1,41 +1,40 @@
 diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 --- a/osfmk/arm64/sweet_stage.c
 +++ b/osfmk/arm64/sweet_stage.c
-@@ -1,9 +1,10 @@
+@@ -1,8 +1,9 @@
  /*
   * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
   * of the boot framebuffer V=P, so these writes work from C with the MMU on
 - * and without any IOKit driver. Each stage is a 128x4 block at x=300,
 - * y=40+stage*20; stage 0 is the C entry and stage 7 is immediately before
-- * arm_vm_init tears down the bootstrap TTBR0.
-+ * and without any IOKit driver. Stages 0-11 are 128x4 blocks at x=300,
-+ * y=40+stage*20. Stages 12-15 continue in the x=500 column and stage 16 is
-+ * in the x=700 column; stage 7 is immediately before arm_vm_init tears down
-+ * the bootstrap TTBR0.
++ * and without any IOKit driver. Stages are 128x4 blocks at
++ * y=40+(stage&7)*20, one column per group: 0-11 x=300, 12-15 x=500,
++ * 16-19 x=700, 20-23 x=900, 24-27 x=1100. Stage 7 is immediately before
+  * arm_vm_init tears down the bootstrap TTBR0.
   */
  #include <pexpert/pexpert.h>
- #include <pexpert/arm64/boot.h>
-@@ -12,14 +13,16 @@
+@@ -12,14 +13,17 @@
  void
  sweet_stage_mark(boot_args *args, unsigned int stage)
  {
 -	static const uint32_t colors[16] = {
-+	static const uint32_t colors[24] = {
++	static const uint32_t colors[28] = {
  		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
  		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
  		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
 -		0xffff0080u, 0xff80ff00u, 0xff4080c0u, 0xffc08040u
 +		0xffff0080u, 0xff80ff00u, 0xff4080c0u, 0xffc08040u,
 +		0xff20c0ffu, 0xffff8040u, 0xffc020ffu, 0xff80c020u,
-+		0xff00ff40u, 0xffff40ffu, 0xff40ffffu, 0xffffff80u
++		0xff00ff40u, 0xffff40ffu, 0xff40ffffu, 0xffffff80u,
++		0xffff0000u, 0xffff8000u, 0xffffff40u, 0xffff00ffu
  	};
  
 -	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 23) {
++	if (args == NULL || stage > 27) {
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,14 +34,14 @@
+@@ -31,14 +35,15 @@
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
@@ -48,23 +47,64 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
  	}
  	uint32_t y = 40u + (stage & 7u) * 20u;
 -	uint32_t x = 300u;
-+	uint32_t x = stage < 12u ? 300u : (stage < 16u ? 500u : (stage < 20u ? 700u : 900u));
++	uint32_t x = stage < 12u ? 300u : (stage < 16u ? 500u :
++	    (stage < 20u ? 700u : (stage < 24u ? 900u : 1100u)));
  	for (uint32_t row = 0; row < 4; row++) {
  		volatile uint32_t *line = fb + (uint64_t)(y + row) * (stride / 4u);
  		for (uint32_t col = x; col < x + 128u; col++) {
 diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
 --- a/osfmk/arm64/arm_vm_init.c
 +++ b/osfmk/arm64/arm_vm_init.c
-@@ -1812,6 +1812,8 @@
+@@ -1812,6 +1812,48 @@
  #define ARM64_PHYSMAP_SLIDE_RANGE (1ULL << 30) // 1 GB
  #define ARM64_PHYSMAP_SLIDE_MASK  (ARM64_PHYSMAP_SLIDE_RANGE - 1)
  
 +extern void sweet_stage_mark(boot_args *args, unsigned int stage);
 +
++/*
++ * Guacamole: report how a kernel VA translates through a candidate TTBR1
++ * root. Returns 0 when the mapping is present and executable at EL1, or the
++ * stage number naming the first level that is not usable (24: L1 entry,
++ * 25: L2 entry, 26: L3 entry, 27: privileged execute-never).
++ */
++static unsigned int
++guac_kva_exec_status(tt_entry_t *root, vm_offset_t va)
++{
++	tt_entry_t e1 = root[L1_TABLE_INDEX(va)];
++	tt_entry_t *l2;
++	tt_entry_t e2;
++	pt_entry_t *l3;
++	pt_entry_t p;
++
++	if ((e1 & ARM_TTE_VALID) == 0) {
++		return 24;
++	}
++	if ((e1 & ARM_TTE_TYPE_MASK) != ARM_TTE_TYPE_TABLE) {
++		return 25;
++	}
++	l2 = (tt_entry_t *)phystokv(e1 & ARM_TTE_TABLE_MASK);
++	e2 = l2[L2_TABLE_INDEX(va)];
++	if ((e2 & ARM_TTE_VALID) == 0) {
++		return 25;
++	}
++	if ((e2 & ARM_TTE_TYPE_MASK) == ARM_TTE_TYPE_BLOCK) {
++		return (e2 & ARM_TTE_BLOCK_PNX) ? 27 : 0;
++	}
++	if ((e2 & ARM_TTE_TYPE_MASK) != ARM_TTE_TYPE_TABLE) {
++		return 25;
++	}
++	l3 = (pt_entry_t *)phystokv(e2 & ARM_TTE_TABLE_MASK);
++	p = l3[L3_TABLE_INDEX(va)];
++	if ((p & ARM_PTE_TYPE) != ARM_PTE_TYPE) {
++		return 26;
++	}
++	return (p & ARM_PTE_PNX) ? 27 : 0;
++}
++
  void
  arm_vm_init(uint64_t memory_size, boot_args * args)
  {
-@@ -1825,11 +1827,16 @@
+@@ -1825,11 +1867,16 @@
  	vm_offset_t      ptpage_vaddr;
  	vm_map_address_t dynamic_memory_begin;
  
@@ -81,7 +121,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  #if KASAN
  	real_phys_size = args->memSize + (shadow_ptop - shadow_pbase);
  #else
-@@ -1911,6 +1918,8 @@
+@@ -1911,6 +1958,8 @@
  		panic("Unsupported memory configuration %lx", mem_size);
  	}
  
@@ -90,18 +130,47 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  	boot_tte = (tt_entry_t *)&bootstrap_pagetables;
  	boot_ttep = kvtophys((vm_offset_t)boot_tte);
  
-@@ -2140,21 +2149,38 @@
+@@ -2140,21 +2189,66 @@
  
  	arm_set_user_tbi();
  
 +	sweet_stage_mark(args, 19);
 +
  	arm_vm_physmap_init(args);
-+
+-	set_mmu_ttb_alternate(cpu_ttep & TTBR_BADDR_MASK);
+ 
 +	sweet_stage_mark(args, 20);
 +
- 	set_mmu_ttb_alternate(cpu_ttep & TTBR_BADDR_MASK);
- 
++	/*
++	 * Guacamole: before switching, walk the C-built tables for the code
++	 * that runs right after the switch. A stage 24-27 marker names the
++	 * first level that would not fetch; no marker means the entries are
++	 * present and executable.
++	 *
++	 * guacboot1=1 keeps the bootstrap KVA root instead of cpu_tte, as a
++	 * control: if the later markers appear with it, the switch sequence is
++	 * sound and only the C-built mapping is at fault.
++	 */
++	{
++		unsigned int guac_stage;
++		int guac_bootstrap_ttbr1 = 0;
++
++		guac_stage = guac_kva_exec_status(cpu_tte, (vm_offset_t)&arm_vm_init);
++		if (guac_stage == 0) {
++			guac_stage = guac_kva_exec_status(cpu_tte, (vm_offset_t)&sweet_stage_mark);
++		}
++		if (guac_stage != 0) {
++			sweet_stage_mark(args, guac_stage);
++		}
++
++		PE_parse_boot_argn("guacboot1", &guac_bootstrap_ttbr1, sizeof(guac_bootstrap_ttbr1));
++		if (guac_bootstrap_ttbr1) {
++			set_mmu_ttb_alternate((boot_ttep + ARM_PGBYTES) & TTBR_BADDR_MASK);
++		} else {
++			set_mmu_ttb_alternate(cpu_ttep & TTBR_BADDR_MASK);
++		}
++	}
++
 +	sweet_stage_mark(args, 21);
 +
  #if XNU_MONITOR
@@ -130,7 +199,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  	// From here on out, we're off the bootstrap translation tables.
  
  
-@@ -2248,6 +2274,8 @@
+@@ -2248,6 +2342,8 @@
  #endif
  	pmap_bootstrap(dynamic_memory_begin);
  
@@ -139,7 +208,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  	disable_preemption();
  
  	/*
-@@ -2298,6 +2326,8 @@
+@@ -2298,6 +2394,8 @@
  		cpu_l1_tte++;
  	}
  

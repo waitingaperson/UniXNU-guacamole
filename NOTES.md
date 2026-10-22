@@ -323,6 +323,15 @@
   `sysctl_register_oid` calls work) and before `PE_init_iokit` (so the
   platform UUID SHA1 has a registered crypto table).
 
+- r55 moved that bootstrap to `STARTUP(SYSCTL, ...)` and regressed to
+  stage 86: the corecrypto start itself does not complete at the SYSCTL
+  phase (FIPS POST or the sysctl registration), and the boot never reaches
+  the SYSCTL marker (95).
+- r56 puts the crypto bootstrap back at `EARLY_BOOT` and skips the early
+  `generatePlatformUUID()` on BCM2837 instead, so `PE_init_iokit` does not
+  call into unregistered crypto. The UUID can be generated after
+  `EARLY_BOOT` once the crypto start is understood.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

@@ -11,7 +11,7 @@ diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
 +	 * proves the 4K kernel entry ran; its absence points at the prelink,
 +	 * the entry address or DarwinBoot.
 +	 */
-+	MOV64	x0, (0x9c000000 + 2368 * 4320)
++	MOV64	x0, (0x9c000000 + 64 * 4320)
 +	mov		w1, #-1
 +	mov		x2, #32
 +	mov		x4, #4320

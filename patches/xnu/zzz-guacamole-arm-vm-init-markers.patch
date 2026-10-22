@@ -19,7 +19,7 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
  
 +static boot_args *sweet_stage_args;
 +
-+void
+ void
 +sweet_stage_set_args(boot_args *args)
 +{
 +	sweet_stage_args = args;
@@ -91,7 +91,7 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +	__asm__ volatile ("dsb sy" ::: "memory");
 +}
 +
- void
++void
  sweet_stage_mark(boot_args *args, unsigned int stage)
  {
 -	static const uint32_t colors[16] = {
@@ -131,7 +131,7 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,19 +130,24 @@
+@@ -31,19 +130,25 @@
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
@@ -144,9 +144,10 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
  	}
 -	uint32_t y = 40u + (stage & 7u) * 20u;
 -	uint32_t x = 300u;
++	/* Keep every marker below 2 MiB: the bootstrap maps only the first
++	 * 2 MiB of the framebuffer V=P, so y=380 would fault. */
 +	uint32_t y = stage < 28u ? 40u + (stage & 7u) * 20u :
-+	    (stage < 80u ? 220u + ((stage - 28u) & 7u) * 20u :
-+	    380u + ((stage - 80u) & 7u) * 20u);
++	    220u + ((stage - 28u) & 7u) * 20u;
 +	uint32_t x = stage < 12u ? 300u : (stage < 16u ? 500u :
 +	    (stage < 20u ? 700u : (stage < 24u ? 900u :
 +	    (stage < 28u ? 1100u : 300u + ((stage < 80u ? stage - 28u : stage - 80u) / 8u) * 200u))));

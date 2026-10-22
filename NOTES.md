@@ -88,6 +88,24 @@
 - The previous 16 KiB r15 chain remains the known-good boot path. The 4 KiB
   kernel is built and prelinked; storage and display compiled, but the first
   boot attempt did not reach a visible stage.
+- **Every CI build after the stage markers was only the bootstrap pass.**
+  `0700-guacamole-skip-sctlr-check.patch` removes the block that follows the
+  `MSR_SCTLR_EL1_X0`/`isb` pair, and `0800-guacamole-post-mmu-mark.patch`
+  inserts the post-MMU marker at that same point. Once 0800 is applied, 0700
+  is no longer reverse-applicable, so the driver's second invocation aborted
+  at `git apply --reverse --check`; `|| true` in the workflow hid it. The
+  uploaded r17-r34 kernels were bootstrap-pass links without the
+  corecrypto/libpthread archives. `build-xnu-4k-baseline.sh` now stamps the
+  sha256 of the patch series and rebuilds the worktree from a clean checkout
+  only when the series changes, so the full pass is reached.
+- **r35 is the first fully linked 4K kernel.** CI run `39783503700` completed
+  the bootstrap pass, all five archives and the prelink step. Kernel
+  `out/guacamole/kernel/kernel-8796-r35.macho`, 15,298,200 bytes, sha256
+  `e9d2790f...`, no undefined symbols. Image
+  `out/guacamole/boot/boot-32-r35.img`, 72,302,592 bytes, sha256
+  `643c5cbb...`, payload `0a2e0d5b...`. It adds stage 21 after the TTBR1
+  switch and stage 22 after the TTBR0/flush, to separate a bad `cpu_tte`
+  from the low-VA marker path.
 
 ## 2026-10-21: project split
 

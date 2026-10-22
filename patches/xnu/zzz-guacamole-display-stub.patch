@@ -1,0 +1,9 @@
+diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -1786,3 +1786,5 @@
+ 	return 0;
+ }
+ #endif
++
++void native_legacy_display_probe(void) { }

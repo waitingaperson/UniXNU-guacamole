@@ -1,7 +1,7 @@
 diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 --- a/osfmk/arm64/sweet_stage.c
 +++ b/osfmk/arm64/sweet_stage.c
-@@ -1,25 +1,54 @@
+@@ -1,25 +1,56 @@
  /*
   * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
   * of the boot framebuffer V=P, so these writes work from C with the MMU on
@@ -32,7 +32,7 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +	if (args == NULL) {
 +		args = sweet_stage_args;
 +	}
-+	static const uint32_t colors[80] = {
++	static const uint32_t colors[88] = {
  		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
  		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
  		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
@@ -53,15 +53,17 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +		0xff60ff60u, 0xffff6060u, 0xff6060ffu, 0xffffff60u,
 +		0xff60ffffu, 0xffff60ffu, 0xffa0a0a0u, 0xffffffffu,
 +		0xff202020u, 0xffff8000u, 0xff0080ffu, 0xff80ff00u,
-+		0xffff0080u, 0xff00ff80u, 0xff8000ffu, 0xff00ffffu
++		0xffff0080u, 0xff00ff80u, 0xff8000ffu, 0xff00ffffu,
++		0xffff4040u, 0xff40ff40u, 0xff4040ffu, 0xffffff40u,
++		0xff40ffffu, 0xffff40ffu, 0xffc0c0c0u, 0xff808080u
  	};
  
 -	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 79) {
++	if (args == NULL || stage > 87) {
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,14 +60,17 @@
+@@ -31,14 +62,18 @@
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
@@ -75,10 +77,11 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 -	uint32_t y = 40u + (stage & 7u) * 20u;
 -	uint32_t x = 300u;
 +	uint32_t y = stage < 28u ? 40u + (stage & 7u) * 20u :
-+	    220u + ((stage - 28u) & 7u) * 20u;
++	    (stage < 80u ? 220u + ((stage - 28u) & 7u) * 20u :
++	    380u + ((stage - 80u) & 7u) * 20u);
 +	uint32_t x = stage < 12u ? 300u : (stage < 16u ? 500u :
 +	    (stage < 20u ? 700u : (stage < 24u ? 900u :
-+	    (stage < 28u ? 1100u : 300u + ((stage - 28u) / 8u) * 200u))));
++	    (stage < 28u ? 1100u : 300u + ((stage < 80u ? stage - 28u : stage - 80u) / 8u) * 200u))));
  	for (uint32_t row = 0; row < 4; row++) {
  		volatile uint32_t *line = fb + (uint64_t)(y + row) * (stride / 4u);
  		for (uint32_t col = x; col < x + 128u; col++) {
@@ -593,7 +596,7 @@ diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
  
  	/*
  	 * N.B. Do not stick anything else
-@@ -612,12 +644,14 @@
+@@ -612,17 +644,21 @@
  	 */
  	kernel_bootstrap_thread_log("sched_startup");
  	sched_startup();
@@ -608,31 +611,41 @@ diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
  
  	/*
  	 * Thread callout service.
-@@ -630,23 +664,27 @@
+ 	 */
++	sweet_stage_mark(NULL, 80);
+ 	kernel_startup_initialize_upto(STARTUP_SUB_THREAD_CALL);
++	sweet_stage_mark(NULL, 81);
+ 
+ 	/*
+ 	 * Remain on current processor as
+@@ -630,25 +666,30 @@
  	 */
  	kernel_bootstrap_thread_log("thread_bind");
  	thread_bind(processor);
-+	sweet_stage_mark(NULL, 76);
++	sweet_stage_mark(NULL, 82);
  
  	/*
  	 * Kick off memory mapping adjustments.
  	 */
  	kernel_bootstrap_thread_log("mapping_adjust");
  	mapping_adjust();
-+	sweet_stage_mark(NULL, 77);
++	sweet_stage_mark(NULL, 83);
  
  	/*
  	 *	Create the clock service.
  	 */
  	kernel_bootstrap_thread_log("clock_service_create");
  	clock_service_create();
-+	sweet_stage_mark(NULL, 78);
++	sweet_stage_mark(NULL, 84);
  
  	/*
  	 *	Create the device service.
  	 */
  	device_service_create();
-+	sweet_stage_mark(NULL, 79);
++	sweet_stage_mark(NULL, 85);
  
  	phys_carveout_init();
++	sweet_stage_mark(NULL, 86);
  
+ #if MACH_KDP
+ 	kernel_bootstrap_log("kdp_init");

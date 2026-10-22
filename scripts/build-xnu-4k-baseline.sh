@@ -31,21 +31,31 @@ if [ ! -x .cache/fakeroot/usr/local/libexec/availability.pl ]; then
     OBJROOT="$ROOT/build/availability" SYMROOT="$ROOT/build/availability" \
     DSTROOT="$ROOT/.cache/fakeroot" CMAKE="$(command -v cmake)" NINJA="$(command -v ninja)"
 fi
-# The optional observation hooks overlap existing root/exec patch context.
-# Remove them first so earlier independent patches retain their idempotent checks.
-# The same holds for the boot-time GPU addon mount (zzy), which edits the owner Data mount function inside the systemos patch.
-# Reverse newest first; the loop below re-applies them in name order.
-for LATE_PATCH in "$ROOT/patches/xnu/zzz-boot-progress.patch" "$ROOT/patches/xnu/zzy-native-gpu-addon-mount.patch"; do
-  if git -C .cache/xnu-work apply --reverse --check "$LATE_PATCH" >/dev/null 2>&1; then
-    git -C .cache/xnu-work apply --reverse "$LATE_PATCH"
-  fi
-done
-for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.patch; do
-  if ! git -C .cache/xnu-work apply --reverse --check "$PATCH" >/dev/null 2>&1; then
+# Several bring-up patches overlap each other's context (the post-MMU marker
+# lands inside the block the SCTLR patch removes, and each stage-marker patch
+# rewrites the previous one), so reverse-applying each patch to test whether it
+# is present is not reliable. Stamp the series instead: the tree is rebuilt from
+# a clean checkout whenever the combined patch hash changes.
+SERIES_HASH=$(
+  if command -v sha256sum >/dev/null 2>&1; then
+    cat "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.patch 2>/dev/null | sha256sum
+  else
+    cat "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.patch 2>/dev/null | shasum -a 256
+  fi | awk '{print $1}'
+)
+SERIES_STAMP=.cache/xnu-work-series
+if [ "$(cat "$SERIES_STAMP" 2>/dev/null)" != "$SERIES_HASH" ]; then
+  # The late observation hooks (zzz-boot-progress, zzy-native-gpu-addon-mount)
+  # edit regions that earlier patches own; applying the series in name order
+  # from a clean tree keeps their context stable.
+  git -C .cache/xnu-work reset --hard -q HEAD
+  git -C .cache/xnu-work clean -fdq
+  for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.patch; do
     git -C .cache/xnu-work apply --check "$PATCH"
     git -C .cache/xnu-work apply "$PATCH"
-  fi
-done
+  done
+  printf '%s\n' "$SERIES_HASH" > "$SERIES_STAMP"
+fi
 export XNU_AVAILABILITY_PL=$ROOT/.cache/fakeroot/usr/local/libexec/availability.pl
 python3 scripts/prepare-xnu-source.py
 # The first pass of a new tree (XNU_BOOTSTRAP=1, set by the unixnu driver) only has to leave the compile records and

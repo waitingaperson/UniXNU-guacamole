@@ -16,9 +16,9 @@ diff --git a/iokit/DriverKit/OSObject.iig b/iokit/DriverKit/OSObject.iig
  #endif
  #endif
  
-+#if KERNEL
++/* @iig implementation */
 +#include <IOKit/IORPC.h>
-+#endif
++/* @iig end */
 +
  #ifndef _IOKIT_UOSOBJECT_H
  #define _IOKIT_UOSOBJECT_H

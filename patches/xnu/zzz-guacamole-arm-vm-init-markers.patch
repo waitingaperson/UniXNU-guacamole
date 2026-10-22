@@ -15,31 +15,32 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
   */
  #include <pexpert/pexpert.h>
  #include <pexpert/arm64/boot.h>
-@@ -12,14 +13,15 @@
+@@ -12,14 +13,16 @@
  void
  sweet_stage_mark(boot_args *args, unsigned int stage)
  {
 -	static const uint32_t colors[16] = {
-+	static const uint32_t colors[20] = {
++	static const uint32_t colors[24] = {
  		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
  		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
  		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
 -		0xffff0080u, 0xff80ff00u, 0xff4080c0u, 0xffc08040u
 +		0xffff0080u, 0xff80ff00u, 0xff4080c0u, 0xffc08040u,
-+		0xff20c0ffu, 0xffff8040u, 0xffc020ffu, 0xff80c020u
++		0xff20c0ffu, 0xffff8040u, 0xffc020ffu, 0xff80c020u,
++		0xff00ff40u, 0xffff40ffu, 0xff40ffffu, 0xffffff80u
  	};
  
 -	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 19) {
++	if (args == NULL || stage > 23) {
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,14 +33,14 @@
+@@ -31,14 +34,14 @@
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
 -			for (uint32_t col = 300; col < 628; col++) {
-+			for (uint32_t col = 300; col < 900; col++) {
++			for (uint32_t col = 300; col < 1100; col++) {
  				line[col] = 0;
  			}
  		}
@@ -47,7 +48,7 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
  	}
  	uint32_t y = 40u + (stage & 7u) * 20u;
 -	uint32_t x = 300u;
-+	uint32_t x = stage < 12u ? 300u : (stage < 16u ? 500u : 700u);
++	uint32_t x = stage < 12u ? 300u : (stage < 16u ? 500u : (stage < 20u ? 700u : 900u));
  	for (uint32_t row = 0; row < 4; row++) {
  		volatile uint32_t *line = fb + (uint64_t)(y + row) * (stride / 4u);
  		for (uint32_t col = x; col < x + 128u; col++) {
@@ -89,19 +90,23 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  	boot_tte = (tt_entry_t *)&bootstrap_pagetables;
  	boot_ttep = kvtophys((vm_offset_t)boot_tte);
  
-@@ -2140,6 +2149,8 @@
+@@ -2140,14 +2149,34 @@
  
  	arm_set_user_tbi();
  
 +	sweet_stage_mark(args, 19);
 +
  	arm_vm_physmap_init(args);
++
++	sweet_stage_mark(args, 20);
++
  	set_mmu_ttb_alternate(cpu_ttep & TTBR_BADDR_MASK);
  
-@@ -2147,6 +2158,16 @@
+ #if XNU_MONITOR
  	ml_enable_monitor();
  #endif
  
+-	set_mmu_ttb(invalid_ttep & TTBR_BADDR_MASK);
 +	/*
 +	 * Guacamole: keep the 2 MiB framebuffer V=P mapping alive in TTBR0
 +	 * after the bootstrap switch so the bring-up markers remain visible.
@@ -112,10 +117,16 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
 +		invalid_tte[fb_index] = boot_tte[fb_index];
 +	}
 +
- 	set_mmu_ttb(invalid_ttep & TTBR_BADDR_MASK);
++	/*
++	 * Guacamole debug: keep the bootstrap TTBR0 root (which has the
++	 * framebuffer V=P entry) instead of the empty invalid table, so the
++	 * post-switch markers can still reach the framebuffer.
++	 */
++	set_mmu_ttb(boot_ttep & TTBR_BADDR_MASK);
  
  	flush_mmu_tlb();
-@@ -2155,6 +2176,8 @@
+ 	kva_active = TRUE;
+@@ -2155,6 +2184,8 @@
  	cpu_tte = (tt_entry_t*)(phystokv(cpu_ttep));
  	invalid_tte = (tt_entry_t*)(phystokv(invalid_ttep));
  
@@ -124,7 +135,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  	// From here on out, we're off the bootstrap translation tables.
  
  
-@@ -2248,6 +2271,8 @@
+@@ -2248,6 +2279,8 @@
  #endif
  	pmap_bootstrap(dynamic_memory_begin);
  
@@ -133,7 +144,7 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  	disable_preemption();
  
  	/*
-@@ -2298,6 +2323,8 @@
+@@ -2298,6 +2331,8 @@
  		cpu_l1_tte++;
  	}
  

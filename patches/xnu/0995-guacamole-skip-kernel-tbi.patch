@@ -1,0 +1,15 @@
+--- a/osfmk/arm/arm_init.c	2026-10-22 14:39:48.726972895 +0800
++++ b/osfmk/arm/arm_init.c	2026-10-22 14:39:48.742058301 +0800
+@@ -324,10 +324,10 @@
+ static void
+ arm_setup_pre_sign(void)
+ {
+-#if __arm64__
++#if __arm64__ && APPLE_ARM64_ARCH_FAMILY
+ 	/* DATA TBI, if enabled, affects the number of VA bits that contain the signature */
+ 	arm_set_kernel_tbi();
+-#endif /* __arm64 */
++#endif /* __arm64__ && APPLE_ARM64_ARCH_FAMILY */
+ }
+ 
+ /*

@@ -266,6 +266,16 @@
   87-94 in `thread_call_initialize`, `ipc_importance_thread_call_init`,
   `work_interval_subsystem_init` and `vm_analytics_init`.
 
+- **r47 reaches stage 86.** The digit readout shows 86, so the
+  THREAD_CALL phase, `thread_bind`, `mapping_adjust`,
+  `clock_service_create`, `device_service_create` and
+  `phys_carveout_init` all return. The hang is after
+  `phys_carveout_init`, in the SYSCTL startup phase, the
+  `vm_kernel_addrperm` random block, `PE_init_iokit`,
+  `STARTUP_SUB_EARLY_BOOT`, `spllo()` or
+  `initialize_screen(kPEAcquireScreen)`.
+- r48 marks those as stages 95-102.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

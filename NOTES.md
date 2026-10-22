@@ -252,6 +252,20 @@
 - r45 marks before/after that startup phase (80/81) and the following
   calls (82-86), with a new y=380 band for stages 80+.
 
+- **The stage number is now drawn on the panel.** `sweet_stage.c` carries a
+  5x7 digit font rendered at 10x in the top-left corner, refreshed on every
+  `sweet_stage_mark`, so the last stage is read directly instead of
+  decoding colors.
+- **A marker above 2 MiB faults.** The bootstrap maps only the first 2 MiB
+  of the framebuffer V=P; stage 80's y=380 block (2,188,800 bytes) was
+  outside it, so the r46 boot died in the marker write and the number
+  stayed at 75. All markers are now kept in the y=220..360 band
+  (offset < 2 MiB); the real hang is still after stage 75, in the
+  `STARTUP_SUB_THREAD_CALL` entries.
+- r47 keeps the layout inside the window and adds per-entry markers
+  87-94 in `thread_call_initialize`, `ipc_importance_thread_call_init`,
+  `work_interval_subsystem_init` and `vm_analytics_init`.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

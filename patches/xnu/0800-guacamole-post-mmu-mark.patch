@@ -1,9 +1,9 @@
 --- a/osfmk/arm64/start.s	2026-10-22 10:58:35.687167221 +0800
-+++ b/osfmk/arm64/start.s	2026-10-22 10:58:35.703564251 +0800
-@@ -645,6 +645,41 @@
- 	// the early debugger rather than corrupting memory or forging a map.
- 	b Lbootstrap_tables_exhausted
- Lbootstrap_tables_ready:
++++ b/osfmk/arm64/start.s	2026-10-22 11:00:48.394352669 +0800
+@@ -648,6 +648,41 @@
+ 	/* Ensure TTEs are visible */
+ 	dsb		ish
+ 
 +	/*
 +	 * Guacamole: map the first 2 MiB of the boot framebuffer V=P so a
 +	 * post-MMU marker can be written with the MMU on. The page is taken
@@ -39,8 +39,8 @@
 +	orr		x10, x10, x6
 +	str		x10, [x8, x9, lsl #3]
 +4:
- 	/* Ensure TTEs are visible */
- 	dsb		ish
+ 
+ 	b		common_start
  
 @@ -781,6 +816,29 @@
  	MSR_SCTLR_EL1_X0

@@ -189,6 +189,15 @@
   y=220+((stage-28)&7)*20). The 900E arbitrary read of physical
   `0x3c0fc000` returns no data, which confirms the BCM2837 panic-log address
   is not backed by memory on SM8150.
+- **r39 reaches stage 40.** The panel shows 28-35 at x=300 and 36-40 at
+  x=500: `cpu_machine_idle_init`, `PE_init_platform`, `ml_map_cpu_pio`,
+  `cpu_timebase_init`, `PE_init_cpu`, `fiq_context_init` and the
+  `dram-base`/`dram-size` lookups all return. The kernel still hangs, so the
+  stop is after the dram lookups, in `gDramBase = *dram_base`,
+  `early_random()`/`__stack_chk_guard`, `machine_conf()` or
+  `kernel_bootstrap()`.
+- r40 marks stage 41 after `gDramSize`, 42 after the stack guard, 43 at the
+  top of `machine_startup` and 44 after `machine_conf()`.
 
 ## 2026-10-21: project split
 

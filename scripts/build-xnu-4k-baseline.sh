@@ -144,10 +144,11 @@ if [ "$CRYPTO_BOOTSTRAP_MODE" != source ] && [ "$CRYPTO_BOOTSTRAP_MODE" != preli
 fi
 CRYPTO_OBJECT_DIR=$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/osfmk/DEVELOPMENT
 if [ -d "$CRYPTO_OBJECT_DIR" ]; then
-  if [ "$(cat "$CRYPTO_OBJECT_DIR/.crypto-bootstrap-mode" 2>/dev/null || echo source)" != "$CRYPTO_BOOTSTRAP_MODE" ]; then
+  CRYPTO_MODE_KEY="$CRYPTO_BOOTSTRAP_MODE:$BOOTSTRAP"
+  if [ "$(cat "$CRYPTO_OBJECT_DIR/.crypto-bootstrap-mode" 2>/dev/null || echo source)" != "$CRYPTO_MODE_KEY" ]; then
     rm -f "$CRYPTO_OBJECT_DIR/prng_random.o"
   fi
-  printf '%s\n' "$CRYPTO_BOOTSTRAP_MODE" > "$CRYPTO_OBJECT_DIR/.crypto-bootstrap-mode"
+  printf '%s\n' "$CRYPTO_MODE_KEY" > "$CRYPTO_OBJECT_DIR/.crypto-bootstrap-mode"
 fi
 if [ "$CRYPTO_BOOTSTRAP_MODE" = prelinked ]; then
   # The original component must initialize through real OSKext startup.

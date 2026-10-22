@@ -303,6 +303,14 @@
   next hardware test: the digit should show 111/112/113/114/115 and name
   the `configureDefaults` step.
 
+- **r53 reaches stage 112.** The digit shows 112, so `createNVRAM` and the
+  `serial-number` block return; stage 113 (after
+  `generatePlatformUUID()`) never appears. The hang is inside
+  `generatePlatformUUID`: `IORegistryEntry::fromPath("/chosen")`, the
+  `unique-chip-id`/`chip-id` lookups, `SHA1Final`, `uuid_unparse` or
+  `OSString::withCString`.
+- r54 marks those as stages 116-122.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

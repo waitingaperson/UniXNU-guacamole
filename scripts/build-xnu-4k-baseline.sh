@@ -4,6 +4,19 @@ set -euo pipefail
 trap 'echo "build-xnu-4k-baseline.sh: line $LINENO: $BASH_COMMAND failed" >&2' ERR
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT"
+# xnu-10063 needs the Xcode 16 mig/iig; the macos-14 runner may default to CLT.
+if [ -z "${DEVELOPER_DIR:-}" ]; then
+  for xcode in /Applications/Xcode_16*.app /Applications/Xcode.app; do
+    if [ -d "$xcode/Contents/Developer" ]; then
+      export DEVELOPER_DIR="$xcode/Contents/Developer"
+      break
+    fi
+  done
+fi
+if [ -n "${DEVELOPER_DIR:-}" ]; then
+  export PATH="$DEVELOPER_DIR/usr/bin:$DEVELOPER_DIR/Toolchains/XcodeDefault.xctoolchain/usr/bin:$PATH"
+fi
+echo "Xcode: ${DEVELOPER_DIR:-system default}"
 # Source versions come from feeds.toml through the unixnu driver; the defaults are the qualified ones.
 XNU_TAG=${UNIXNU_XNU_TAG:-xnu-10063.141.1}
 XNU_COMMIT=${UNIXNU_XNU_COMMIT:-d8b80295118ef25ac3a784134bcf95cd8e88109f}

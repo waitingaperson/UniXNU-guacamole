@@ -14,6 +14,17 @@ trustcache = root / 'EXTERNAL_HEADERS/TrustCache'
 
 if not driverkit.is_dir():
     raise SystemExit(f'xnu source is missing {driverkit}')
+
+driverkit_headers = Path(__file__).resolve().parent / 'driverkit-headers'
+if driverkit_headers.is_dir():
+    for source in driverkit_headers.rglob('*'):
+        if not source.is_file():
+            continue
+        target = driverkit / source.relative_to(driverkit_headers)
+        if not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+
 if not trustcache.is_dir():
     headers = Path(__file__).resolve().parent / 'trustcache-headers'
     if not headers.is_dir():

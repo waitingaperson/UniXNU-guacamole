@@ -71,6 +71,15 @@ if [ "$BOOTSTRAP" != 0 ] && [ "$BOOTSTRAP" != 1 ]; then
   echo 'XNU_BOOTSTRAP must be 0 or 1' >&2
   exit 1
 fi
+if [ "$BOOTSTRAP" = 0 ]; then
+  # The b6ae99c driver builds these between passes; the current main driver
+  # does not, so build the board archives here before the full link.
+  python3 scripts/build-corecrypto-14.py
+  python3 scripts/build-corecrypto-14.py --namespace
+  python3 scripts/build-arm-driver.py ArmDTPlatform
+  python3 scripts/build-arm-driver.py ArmCpu
+  python3 scripts/build-libpthread-kernel.py
+fi
 BOOT_PROGRESS=${XNU_BOOT_PROGRESS:-0}
 if [ "$BOOT_PROGRESS" != 0 ] && [ "$BOOT_PROGRESS" != 1 ]; then
   echo 'XNU_BOOT_PROGRESS must be 0 or 1' >&2

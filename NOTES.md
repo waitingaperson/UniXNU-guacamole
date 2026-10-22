@@ -158,6 +158,26 @@
   the serial block, 32 after `PE_create_console`, 33 after
   `PE_init_printf`. Stages 28-35 draw at y=220+((stage-28)&7)*20, x=300.
 
+- **The stop is inside `PE_create_console()`.** r37's framebuffer (read from
+  RAM) has stages 28, 29, 30 and 31 but not 32. At that point `kernel_map`
+  is NULL, `startup_phase < KMEM`, `PE_putc` is NULL and `vinfo` is still
+  zero, so the fault is in `check_for_panic_log()` or the early
+  `initialize_screen()` mapping.
+- **`check_for_panic_log()` touches a BCM2837 address that does not exist on
+  SM8150.** `BCM2837.h` sets `PLATFORM_PANIC_LOG_PADDR = 0x3c0fc000`; the
+  function maps it (`gPanicBase = 0xfffffff108e00000`, `gPanicSize =
+  0x4000`) and then reads `eph_magic` and `bzero`s 16 KiB there. A 900E
+  read of physical `0x3c0fc000` returns no data, so the kernel access is an
+  external abort. The ADT has no `pram` node, so the DT path returns early.
+- **The early `io_map()` also needs leaf tables that 4K never built.**
+  `io_map()` before `STARTUP_SUB_KMEM` maps at `virtual_space_start` with
+  `pmap_map_bd_with_options()`, which walks L1/L2/L3 and panics with "no
+  PTE" when the leaf is missing; it does not allocate. `init_ptpages()`
+  creates L1/L2 only. r38 pre-allocates 64 MiB of L3 tables at
+  `dynamic_memory_begin` (`init_ptpages_leaf`) and sets
+  `CONFIG_XNU_DT_PANIC_REGION=y` so the platform panic-log address is not
+  used.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

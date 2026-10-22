@@ -1,22 +1,25 @@
 diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
+index e5336e5..47b29d7 100644
 --- a/osfmk/arm64/start.s
 +++ b/osfmk/arm64/start.s
-@@ -460,6 +460,28 @@ LEXT(start_first_cpu)
+@@ -463,6 +463,30 @@ LEXT(start_first_cpu)
  	mov		x20, x0
  	mov		x21, #0
  
 +	/*
-+	 * Guacamole: a 64x32 white band at the bottom-left of the ABL
-+	 * framebuffer, written before any page table or MMU setup. Seeing it
-+	 * proves the 4K kernel entry ran; its absence points at the prelink,
-+	 * the entry address or DarwinBoot.
++	 * Guacamole: a 256x128 white block at y=300, using the framebuffer
++	 * base from boot_args->Video rather than a hard-coded address. It runs
++	 * before any page table or MMU setup. Seeing it proves the 4K kernel
++	 * entry ran; its absence points at the entry address or DarwinBoot.
 +	 */
-+	MOV64	x0, (0x9c000000 + 64 * 4320)
++	ldr		x6, [x20, #0x28]			// Video.v_baseAddr
++	ldr		x4, [x20, #0x38]			// Video.v_rowBytes
++	mov		x7, #300
++	madd	x0, x7, x4, x6
 +	mov		w1, #-1
-+	mov		x2, #32
-+	mov		x4, #4320
++	mov		x2, #128
 +1:
-+	mov		x3, #64
++	mov		x3, #256
 +	mov		x5, x0
 +2:
 +	str		w1, [x5], #4

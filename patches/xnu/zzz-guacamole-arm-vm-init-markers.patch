@@ -914,17 +914,22 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  	// Parse the serial-number data and publish a user-readable string
  	OSData* mydata = (OSData*) (getProperty("serial-number"));
  	if (mydata != NULL) {
-@@ -2140,7 +2144,9 @@
+@@ -2140,7 +2144,14 @@
  			serNoString->release();
  		}
  	}
 +	sweet_stage_mark(NULL, 112);
++#if defined(BCM2837)
++	/* The source corecrypto registration runs at EARLY_BOOT, after this
++	 * point; the platform UUID is generated once crypto is available. */
++#else
  	generatePlatformUUID();
++#endif
 +	sweet_stage_mark(NULL, 113);
  }
  
  void
-@@ -2156,6 +2162,7 @@
+@@ -2156,6 +2167,7 @@
  	if (options == NULL) {
  		return; // /options may not be present
  	}
@@ -932,7 +937,7 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  
  	assert(gIOOptionsEntry == NULL);
  	gIOOptionsEntry = new IODTNVRAM;
-@@ -2165,6 +2172,7 @@
+@@ -2165,6 +2177,7 @@
  	gIOOptionsEntry->init(options, gIODTPlane);
  	gIOOptionsEntry->attach(this);
  	gIOOptionsEntry->start(this);
@@ -940,7 +945,7 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  	options->release();
  }
  
-@@ -2176,15 +2184,19 @@
+@@ -2176,15 +2189,19 @@
  	uuid_string_t     uuid;
  
  #if !defined(__x86_64__)
@@ -960,7 +965,7 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  			if (data2 && data2->getLength() == 4) {
  				SHA1_CTX     context;
  				uint8_t      digest[SHA_DIGEST_LENGTH];
-@@ -2195,17 +2207,20 @@
+@@ -2195,17 +2212,20 @@
  				SHA1Update( &context, data1->getBytesNoCopy(), data1->getLength());
  				SHA1Update( &context, data2->getBytesNoCopy(), data2->getLength());
  				SHA1Final( digest, &context );
@@ -982,12 +987,3 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  	OSData * data;
  
 diff --git a/osfmk/prng/prng_random.c b/osfmk/prng/prng_random.c
---- a/osfmk/prng/prng_random.c
-+++ b/osfmk/prng/prng_random.c
-@@ -450,5 +450,5 @@
- 		panic("source corecrypto initialization failed: %d", source_corecrypto14_status);
- 	}
- }
--STARTUP(EARLY_BOOT, STARTUP_RANK_FIRST, source_corecrypto14_bootstrap);
-+STARTUP(SYSCTL, STARTUP_RANK_LAST, source_corecrypto14_bootstrap);
- #endif

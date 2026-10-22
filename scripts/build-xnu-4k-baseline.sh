@@ -157,6 +157,11 @@ if [ "$CRYPTO_BOOTSTRAP_MODE" = prelinked ]; then
 else
   EXTRA_MAKE_ARGS+=("prng_random.o_CFLAGS_ADD=")
 fi
+if [ "$BOOTSTRAP" = 1 ]; then
+  # The bootstrap pass links without the external archives; it only needs the
+  # compile records, so do not emit the reference to corecrypto_kext_start.
+  EXTRA_MAKE_ARGS+=("prng_random.o_CFLAGS_ADD=-UXNU_SOURCE_CORECRYPTO14")
+fi
 if [ "${XNU_NATIVE_AES:-0}" = 1 ]; then
   if [ "$CRYPTO_BOOTSTRAP_MODE" != prelinked ] || [ "${XNU_SOURCE_CORECRYPTO14:-0}" != 1 ]; then
     echo 'NativeAES currently requires the qualified original AES/crypto prelink closure' >&2

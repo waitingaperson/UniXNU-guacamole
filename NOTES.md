@@ -199,6 +199,18 @@
 - r40 marks stage 41 after `gDramSize`, 42 after the stack guard, 43 at the
   top of `machine_startup` and 44 after `machine_conf()`.
 
+- **r40 reaches stage 44.** The panel shows 28-35 at x=300, 36-43 at x=500
+  and 44 at x=700. `gDramBase`/`gDramSize`, `early_random`, the stack guard
+  and `machine_conf()` all complete. The hang is inside
+  `kernel_bootstrap()` (or its first `printf`), which starts with
+  `printf("%s\n", version)`; the panel shows no kernel text, so the console
+  path is still suspect.
+- r41 marks `kernel_bootstrap` as stages 45 (entry) through 55
+  (`printf`, `scale_setup`, `vm_mem_bootstrap`,
+  `kernel_startup_initialize_upto(OSLOG)`, `console_init`, `stackshot_init`,
+  `sched_init`, `MACH_IPC`, `PMAP_ACTIVATE_KERNEL`, `mapping_free_prime`),
+  using a saved boot_args pointer for the calls without an argument.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

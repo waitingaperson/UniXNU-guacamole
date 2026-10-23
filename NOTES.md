@@ -369,6 +369,15 @@
   vfsinit, sysctl_mib_init, bsd_autoconf, setconf and a successful
   vfs_mountroot.
 
+- **r60 still shows 130, with no console text.** The `bsd_init` markers
+  132-140 never appear, so the hang is before `kauth_init()`:
+  `platform_stall_panic_or_spin`, `throttle_init()`, `printf(copyright)`
+  or `dev_kmem_init()`. The video console is attached at stage 100 but
+  draws nothing, so a console-path hang (the first `printf` after
+  `initialize_screen(kPEAcquireScreen)`) is the leading suspect.
+- r61 marks `bsd_init`'s entry, the stall call, `throttle_init`, the
+  copyright `printf` and `dev_kmem_init` as stages 141-145.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

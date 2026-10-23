@@ -347,6 +347,16 @@
   `fips_mode=4` and adds it to the board arguments; the POST is skipped and
   the KPI table is still registered.
 
+- **r58 reaches stage 102.** `fips_mode=4` skips the FIPS POST,
+  `corecrypto_kext_start` returns, EARLY_BOOT finishes, `spllo`,
+  `initialize_screen(kPEAcquireScreen)`, the commpage and
+  `mac_policy_initmach` all pass. The hang is after stage 102:
+  `vnguard_policy_init`, the LOCKDOWN startup phase,
+  `OSKextRemoveKextBootstrap`, `machine_lockdown`, `PE_lockdown_iokit`,
+  `vm_set_restrictions` or `bsd_init`.
+- r59 marks those as stages 125-131 (stages >= 128 reuse the x=300 column;
+  the digit is authoritative).
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

@@ -402,6 +402,12 @@
 - r64 calls `ml_set_max_cpus(topology_info.num_cpus)` at the end of
   `ml_parse_cpu_topology()` so the flag is published before `bsd_init`.
 
+- r64 called `ml_set_max_cpus()` inside `ml_parse_cpu_topology()` and the
+  phone reset to 900E early: the topology parse runs **before**
+  `kernel_startup_bootstrap()` initializes the lock subsystem, so locking
+  `max_cpus_lock` there faults. r65 moves the call to `machine_conf()`
+  (after the locks are up and the topology is final).
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

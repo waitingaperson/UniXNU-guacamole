@@ -451,6 +451,19 @@
   platform kext, so the catch-all personality matched. r74 makes the fallback
   subclass call `IOPlatformExpert::start` and log instead of panicking.
 
+- **r74-r76 pass the platform match and the dlil wait.** The framebuffer text
+  console works after `PE_initialize_console(kPETextScreen)`; the platform
+  fallback (`IOPanicPlatform` -> generic `IOPlatformExpert`) lets IOKit
+  continue. r76 reaches marker 187 (`ifnet_attach` returned) but the console
+  text stops at `skip attaching fsw to lo0 using legacy TX model`; the next
+  `printf` may be stuck in the console ring/flush path (single CPU, ticket
+  locks, preemption on). r77 replaces the printf breadcrumbs with lock-free
+  framebuffer markers 189-193 (`gif_init`, `pfloginit`, `ether_family_init`,
+  `net_init_run`, `inittodr`); r78 adds 194 after `bpfattach`.
+- `scripts/mkadt.py` has `compatible = sweet,display` commented out for now so
+  AppleCLCD does not take over the display and hide the kernel console; GPU
+  work is deferred. Restore it when the console is no longer needed.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

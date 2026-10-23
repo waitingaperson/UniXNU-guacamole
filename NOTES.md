@@ -378,6 +378,13 @@
 - r61 marks `bsd_init`'s entry, the stall call, `throttle_init`, the
   copyright `printf` and `dev_kmem_init` as stages 141-145.
 
+- **r61 still shows 130.** Disassembly confirms the 141 marker is the first
+  instruction sequence in `bsd_init`, so `bsd_init` is never entered. The
+  only code between `vm_set_restrictions` (stage 130) and `bsd_init` is
+  `kperf_init_early()`; that is the hang.
+- r62 marks it (146/147) and skips `kperf_init_early()` on non-Apple builds
+  (`APPLE_ARM64_ARCH_FAMILY`).
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

@@ -1092,6 +1092,24 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  #else /* !defined(__x86_64__) */
  	OSData * data;
  
+diff --git a/iokit/Kernel/IOMapper.cpp b/iokit/Kernel/IOMapper.cpp
+--- a/iokit/Kernel/IOMapper.cpp
++++ b/iokit/Kernel/IOMapper.cpp
+@@ -60,7 +60,13 @@
+ OSMetaClassDefineReservedUnused(IOMapper, 14);
+ OSMetaClassDefineReservedUnused(IOMapper, 15);
+ 
+-IOMapper * IOMapper::gSystem = (IOMapper *) IOMapper::kUnknown;
++/*
++ * Native ports have no system IOMapper and the platform expert starts after
++ * mbinit(); kUnknown makes IOMapperIOVMAlloc() sleep in
++ * waitForSystemMapper() forever. Start as kNoMapper so early clients take the
++ * physical-address passthrough path; a real IOMapper::start() overwrites this.
++ */
++IOMapper * IOMapper::gSystem = (IOMapper *) IOMapper::kNoMapper;
+ 
+ class IOMapperLock {
+ 	IOLock *fWaitLock;
 diff --git a/osfmk/prng/prng_random.c b/osfmk/prng/prng_random.c
 --- a/osfmk/prng/prng_random.c
 +++ b/osfmk/prng/prng_random.c

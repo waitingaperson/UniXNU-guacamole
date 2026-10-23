@@ -277,7 +277,7 @@ diff -r C6/bsd/kern/uipc_mbuf.c B6/bsd/kern/uipc_mbuf.c
  
 diff -r C6/bsd/net/dlil.c B6/bsd/net/dlil.c
 --- C6/bsd/net/dlil.c	2026-10-23 23:17:10.518634585 +0800
-+++ B6/bsd/net/dlil.c	2026-10-23 23:33:06.745664716 +0800
++++ B6/bsd/net/dlil.c	2026-10-24 00:10:11.623135066 +0800
 @@ -143,6 +143,8 @@
  
  #include <os/log.h>
@@ -319,6 +319,71 @@ diff -r C6/bsd/net/dlil.c B6/bsd/net/dlil.c
  #pragma unused(w)
  	struct dlil_threading_info *inp = v;
  
+@@ -8635,6 +8642,8 @@
+ errno_t
+ ifnet_attach(ifnet_t ifp, const struct sockaddr_dl *ll_addr)
+ {
++	sweet_stage_mark(NULL, 188);
++	printf("SWEET: ifnet_attach enter\n");
+ #if SKYWALK
+ 	boolean_t netif_compat;
+ 	if_nexus_netif  nexus_netif;
+@@ -8707,6 +8716,7 @@
+ 		return ENODEV;
+ 	}
+ 
++	printf("SWEET: ifnet_attach proto hash\n");
+ 	/* Allocate protocol hash table */
+ 	VERIFY(ifp->if_proto_hash == NULL);
+ 	ifp->if_proto_hash = kalloc_type(struct proto_hash_entry,
+@@ -8853,6 +8863,7 @@
+ 			/* NOTREACHED */
+ 		}
+ 	}
++	printf("SWEET: ifnet_attach threads\n");
+ 	/*
+ 	 * If the driver supports the new transmit model, calculate flow hash
+ 	 * and create a workloop starter thread to invoke the if_start callback
+diff -r C6/bsd/net/if_loop.c B6/bsd/net/if_loop.c
+--- C6/bsd/net/if_loop.c	2026-10-23 23:17:10.520634531 +0800
++++ B6/bsd/net/if_loop.c	2026-10-24 00:10:11.622363906 +0800
+@@ -634,11 +634,16 @@
+ 
+ /* ARGSUSED */
+ void
++extern void sweet_stage_mark(void *args, unsigned int stage);
++
+ loopattach(void)
+ {
+ 	struct ifnet_init_eparams lo_init;
+ 	errno_t result = 0;
+ 
++	sweet_stage_mark(NULL, 184);
++	printf("SWEET: loopattach enter\n");
++
+ 	PE_parse_boot_argn("lo_txstart", &lo_txstart, sizeof(lo_txstart));
+ 
+ 	lo_reg_if_mods();
+@@ -672,6 +677,7 @@
+ 	lo_init.ioctl                   = lo_ioctl;
+ 	lo_init.set_bpf_tap             = lo_set_bpf_tap;
+ 
++	sweet_stage_mark(NULL, 185);
+ 	result = ifnet_allocate_extended(&lo_init, &lo_ifp);
+ 	if (result != 0) {
+ 		panic("%s: couldn't allocate loopback ifnet (%d)",
+@@ -690,7 +696,11 @@
+ 	ifnet_set_hdrlen(lo_ifp, sizeof(struct loopback_header));
+ 	ifnet_set_eflags(lo_ifp, IFEF_SENDLIST, IFEF_SENDLIST);
+ 
++	sweet_stage_mark(NULL, 186);
++	printf("SWEET: loopattach ifnet_attach\n");
+ 	result = ifnet_attach(lo_ifp, NULL);
++	sweet_stage_mark(NULL, 187);
++	printf("SWEET: loopattach ifnet_attach done %d\n", result);
+ 	if (result != 0) {
+ 		panic("%s: couldn't attach loopback ifnet (%d)",
+ 		    __func__, result);
 diff -r C6/iokit/Kernel/IOMapper.cpp B6/iokit/Kernel/IOMapper.cpp
 --- C6/iokit/Kernel/IOMapper.cpp	2026-10-23 23:17:10.573633098 +0800
 +++ B6/iokit/Kernel/IOMapper.cpp	2026-10-23 23:17:10.875578152 +0800
@@ -830,20 +895,6 @@ diff -r C6/osfmk/arm64/machine_routines.c B6/osfmk/arm64/machine_routines.c
  
  
  	/*
-diff -r C6/osfmk/arm64/pcb.c B6/osfmk/arm64/pcb.c
---- C6/osfmk/arm64/pcb.c	2026-10-23 23:17:10.603632287 +0800
-+++ B6/osfmk/arm64/pcb.c	2026-10-23 23:33:06.745093886 +0800
-@@ -555,6 +555,10 @@
- 
- 	call_continuation_kprintf("thread = %p continuation = %p, stack = %lx\n",
- 	    current_thread(), continuation, current_thread()->machine.kstackptr);
-+	{
-+		extern void sweet_stage_mark(void *args, unsigned int stage);
-+		sweet_stage_mark(NULL, 183);
-+	}
- 	Call_continuation(continuation, parameter, wresult, enable_interrupts);
- }
- 
 diff -r C6/osfmk/arm64/sweet_stage.c B6/osfmk/arm64/sweet_stage.c
 --- C6/osfmk/arm64/sweet_stage.c	2026-10-23 23:33:18.143296208 +0800
 +++ B6/osfmk/arm64/sweet_stage.c	2026-10-23 23:17:10.875354799 +0800

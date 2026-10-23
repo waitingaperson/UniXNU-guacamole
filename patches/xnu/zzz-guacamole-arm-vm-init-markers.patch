@@ -339,7 +339,7 @@ diff -r C6/iokit/Kernel/IOMapper.cpp B6/iokit/Kernel/IOMapper.cpp
  	IOLock *fWaitLock;
 diff -r C6/iokit/Kernel/IOPlatformExpert.cpp B6/iokit/Kernel/IOPlatformExpert.cpp
 --- C6/iokit/Kernel/IOPlatformExpert.cpp	2026-10-23 23:17:10.575633044 +0800
-+++ B6/iokit/Kernel/IOPlatformExpert.cpp	2026-10-23 23:17:10.875514735 +0800
++++ B6/iokit/Kernel/IOPlatformExpert.cpp	2026-10-23 23:52:18.394988373 +0800
 @@ -62,6 +62,8 @@
  #include <pexpert/pexpert.h>
  #include <uuid/uuid.h>
@@ -444,6 +444,24 @@ diff -r C6/iokit/Kernel/IOPlatformExpert.cpp B6/iokit/Kernel/IOPlatformExpert.cp
  #else /* !defined(__x86_64__) */
  	OSData * data;
  
+@@ -2315,8 +2337,14 @@
+ 		platform_name = provider->getName();
+ 	}
+ 
+-	panic("Unable to find driver for this platform: \"%s\".",
+-	    platform_name);
++	/*
++	 * Native ports carry no platform kext, so the fallback personality is the
++	 * only match for IOPlatformExpertDevice. Continue with the generic
++	 * platform expert instead of panicking, and let the boot report how far it
++	 * gets.
++	 */
++	IOLog("sweet: no platform driver for \"%s\"; using the generic "
++	    "platform expert\n", platform_name);
+ 
+-	return false;
++	return IOPlatformExpert::start(provider);
+ }
 diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
 --- C6/osfmk/arm/arm_init.c	2026-10-23 23:33:18.159317562 +0800
 +++ B6/osfmk/arm/arm_init.c	2026-10-23 23:38:01.786779782 +0800

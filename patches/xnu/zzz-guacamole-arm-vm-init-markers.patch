@@ -1,7 +1,7 @@
 diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 --- a/osfmk/arm64/sweet_stage.c
 +++ b/osfmk/arm64/sweet_stage.c
-@@ -1,25 +1,136 @@
+@@ -1,25 +1,138 @@
  /*
   * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
   * of the boot framebuffer V=P, so these writes work from C with the MMU on
@@ -98,7 +98,7 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +	if (args == NULL) {
 +		args = sweet_stage_args;
 +	}
-+	static const uint32_t colors[144] = {
++	static const uint32_t colors[152] = {
  		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
  		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
  		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
@@ -135,15 +135,17 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +		0xff400000u, 0xff004000u, 0xff000040u, 0xff404000u,
 +		0xff004040u, 0xff400040u, 0xff202020u, 0xffe0e0e0u,
 +		0xffc00000u, 0xff00c000u, 0xff0000c0u, 0xffc0c000u,
-+		0xff00c0c0u, 0xffc000c0u, 0xff808000u, 0xff008080u
++		0xff00c0c0u, 0xffc000c0u, 0xff808000u, 0xff008080u,
++		0xffff8080u, 0xff80ff80u, 0xff8080ffu, 0xffffff80u,
++		0xff80ffffu, 0xffff80ffu, 0xffc0c0c0u, 0xff606060u
  	};
  
 -	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 143) {
++	if (args == NULL || stage > 151) {
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,19 +142,27 @@
+@@ -31,19 +144,27 @@
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
@@ -1067,7 +1069,39 @@ diff --git a/osfmk/prng/prng_random.c b/osfmk/prng/prng_random.c
 diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
 --- a/bsd/kern/bsd_init.c
 +++ b/bsd/kern/bsd_init.c
-@@ -510,6 +510,7 @@
+@@ -486,9 +486,17 @@
+ 	boolean_t       netboot = FALSE;
+ #endif
+ 
++	{
++		extern void sweet_stage_mark(boot_args *args, unsigned int stage);
++		sweet_stage_mark(NULL, 141);
++	}
+ #if (DEVELOPMENT || DEBUG)
+ 	platform_stall_panic_or_spin(PLATFORM_STALL_XNU_LOCATION_BSD_INIT);
+ #endif
++	{
++		extern void sweet_stage_mark(boot_args *args, unsigned int stage);
++		sweet_stage_mark(NULL, 142);
++	}
+ 
+ #define DEBUG_BSDINIT 0
+ 
+@@ -499,17 +507,21 @@
+ #endif
+ 
+ 	throttle_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 143); }
+ 
+ 	printf(copyright);
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 144); }
+ 
+ #if CONFIG_DEV_KMEM
+ 	bsd_init_kprintf("calling dev_kmem_init\n");
+ 	dev_kmem_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 145); }
+ #endif
+ 
  	/* Initialize kauth subsystem before instancing the first credential */
  	bsd_init_kprintf("calling kauth_init\n");
  	kauth_init();
@@ -1075,7 +1109,7 @@ diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
  
  	/* kernel_task->proc = kernproc; */
  	set_bsdtask_info(kernel_task, (void *)kernproc);
-@@ -568,6 +569,7 @@
+@@ -568,6 +580,7 @@
  	 * Initialize the MAC Framework
  	 */
  	mac_policy_initbsd();
@@ -1083,7 +1117,7 @@ diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
  
  #if defined (__i386__) || defined (__x86_64__)
  	/*
-@@ -680,16 +682,19 @@
+@@ -680,16 +693,19 @@
  	 */
  	bsd_init_kprintf("calling bsd_bufferinit\n");
  	bsd_bufferinit();
@@ -1103,7 +1137,7 @@ diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
  
  #if CONFIG_PROC_UUID_POLICY
  	/* Initial proc_uuid_policy subsystem */
-@@ -784,9 +789,11 @@
+@@ -784,9 +800,11 @@
  
  	bsd_init_kprintf("calling sysctl_mib_init\n");
  	sysctl_mib_init();
@@ -1115,7 +1149,7 @@ diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
  
  #if CONFIG_DTRACE
  	dtrace_postinit();
-@@ -862,12 +869,14 @@
+@@ -862,12 +880,14 @@
  
  		bsd_init_kprintf("calling setconf\n");
  		setconf();
@@ -1130,4 +1164,3 @@ diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
  			break;
  		}
  		rootdevice[0] = '\0';
-diff --git a/bsd/dev/sweet_ufs.c b/bsd/dev/sweet_ufs.c

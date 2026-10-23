@@ -118,14 +118,16 @@ publishes the resulting `GUACESP` volume.
 ## Test
 
 ```sh
-fastboot boot out/guacamole/boot/boot-32-r78.img
+fastboot boot out/guacamole/boot/boot-32-r79.img
 ```
 
-The `kernel-8796` branch carries a from-source XNU 8796 rebuild. r78 boots
-through UniXNU, DarwinBoot and XNU into `bsd_init`; the last verifiable point
-is marker 187 (`ifnet_attach` for `lo0` returned). Markers 189-194 cover the
-steps after `loopattach` (`gif_init`, `pfloginit`, `ether_family_init`,
-`net_init_run`, `inittodr`, `bpfattach`); the digit shows the last one reached.
+The `kernel-8796` branch carries a from-source XNU 8796 rebuild. r79 boots
+through UniXNU, DarwinBoot and XNU into `bsd_init` and past the platform
+match, dlil and `ifnet_attach` for `lo0` (marker 187). `DEBUG_BSDINIT` is on,
+so every `bsd_init` step prints to the framebuffer console; markers 189-194
+cover `gif_init`, `pfloginit`, `ether_family_init`, `net_init_run`,
+`inittodr` and `bpfattach`, then 139/140 cover `setconf` and
+`vfs_mountroot`. The last printed line and the digit show the stall point.
 
 `fastboot boot` is temporary and leaves Android and every partition untouched.
 Use the NOSB image only; secure-boot builds cannot load the unsigned

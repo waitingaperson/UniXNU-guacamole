@@ -393,6 +393,15 @@
   `dlil_init`, `socketinit` or `domaininit`.
 - r63 marks those as stages 148-157.
 
+- **r63 reaches stage 156.** `proc_uuid_policy_init` returns; the hang is in
+  `mcache_init()`, whose first line is `ml_wait_max_cpus()`. That sleeps
+  until `max_cpus_initialized == MAX_CPUS_SET`, which only
+  `ml_set_max_cpus()` sets; on Apple the platform expert calls it, and a
+  native port has nobody to. `cpus=1` does not help because the wait is on
+  the topology flag, not the boot argument.
+- r64 calls `ml_set_max_cpus(topology_info.num_cpus)` at the end of
+  `ml_parse_cpu_topology()` so the flag is published before `bsd_init`.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

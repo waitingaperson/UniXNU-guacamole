@@ -1411,3 +1411,42 @@ diff --git a/bsd/kern/uipc_mbuf.c b/bsd/kern/uipc_mbuf.c
  	ref_cache = mcache_create("mext_ref", sizeof(struct ext_ref),
  	    0, 0, MCR_SLEEP);
  
+diff --git a/bsd/net/dlil.c b/bsd/net/dlil.c
+--- a/bsd/net/dlil.c
++++ b/bsd/net/dlil.c
+@@ -143,6 +143,8 @@
+ 
+ #include <os/log.h>
+ 
++extern void sweet_stage_mark(void *args, unsigned int stage);
++
+ #define DBG_LAYER_BEG           DLILDBG_CODE(DBG_DLIL_STATIC, 0)
+ #define DBG_LAYER_END           DLILDBG_CODE(DBG_DLIL_STATIC, 2)
+ #define DBG_FNC_DLIL_INPUT      DLILDBG_CODE(DBG_DLIL_STATIC, (1 << 8))
+@@ -1676,6 +1678,7 @@
+ static void
+ dlil_decr_pending_thread_count(void)
+ {
++	sweet_stage_mark(NULL, 179);
+ 	LCK_MTX_ASSERT(&dlil_thread_sync_lock, LCK_MTX_ASSERT_NOTOWNED);
+ 	lck_mtx_lock(&dlil_thread_sync_lock);
+ 	VERIFY(dlil_pending_thread_cnt > 0);
+@@ -2701,8 +2704,10 @@
+ 	 * Wait for the created kernel threads for dlil to get
+ 	 * scheduled and run at least once before we proceed
+ 	 */
++	sweet_stage_mark(NULL, 180);
+ 	lck_mtx_lock(&dlil_thread_sync_lock);
+ 	while (dlil_pending_thread_cnt != 0) {
++		sweet_stage_mark(NULL, 181);
+ 		DLIL_PRINTF("%s: Waiting for all the create dlil kernel "
+ 		    "threads to get scheduled at least once.\n", __func__);
+ 		(void) msleep(&dlil_pending_thread_cnt, &dlil_thread_sync_lock,
+@@ -3009,6 +3014,7 @@
+ static void
+ dlil_main_input_thread_func(void *v, wait_result_t w)
+ {
++	sweet_stage_mark(NULL, 178);
+ #pragma unused(w)
+ 	struct dlil_threading_info *inp = v;
+ 

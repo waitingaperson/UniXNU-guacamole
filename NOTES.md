@@ -357,6 +357,18 @@
 - r59 marks those as stages 125-131 (stages >= 128 reuse the x=300 column;
   the digit is authoritative).
 
+- **r59 reaches stage 130.** `vnguard_policy_init`, the LOCKDOWN startup
+  phase, `OSKextRemoveKextBootstrap`, `machine_lockdown`,
+  `PE_lockdown_iokit` and `vm_set_restrictions` all return; stage 131
+  (`bsd_init` returns) is never reached, so the hang is inside `bsd_init`.
+  The prime suspect is the root mount: `sweet_ufs` must find `/sweet-ufs`
+  and the `userdata` GPT partition, otherwise `vfs_mountroot` loops forever.
+  The driver prints `SWEET UFS: ...` and bsd_init prints
+  `cannot mount root, errno = ...`; the video console should show them.
+- r60 marks `bsd_init` (132-140): kauth, MAC, bufferinit, IOKit time,
+  vfsinit, sysctl_mib_init, bsd_autoconf, setconf and a successful
+  vfs_mountroot.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

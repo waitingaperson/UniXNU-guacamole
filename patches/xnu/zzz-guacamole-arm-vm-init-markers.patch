@@ -1,7 +1,7 @@
 diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 --- a/osfmk/arm64/sweet_stage.c
 +++ b/osfmk/arm64/sweet_stage.c
-@@ -1,25 +1,132 @@
+@@ -1,25 +1,134 @@
  /*
   * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
   * of the boot framebuffer V=P, so these writes work from C with the MMU on
@@ -98,7 +98,7 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +	if (args == NULL) {
 +		args = sweet_stage_args;
 +	}
-+	static const uint32_t colors[128] = {
++	static const uint32_t colors[136] = {
  		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
  		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
  		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
@@ -131,15 +131,17 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +		0xffffff00u, 0xff00ffffu, 0xffff00ffu, 0xff00ff00u,
 +		0xffff0000u, 0xff0000ffu, 0xff808080u, 0xffc0c0c0u,
 +		0xff800000u, 0xff008000u, 0xff000080u, 0xff808000u,
-+		0xff008080u, 0xff800080u, 0xff404040u, 0xffffffffu
++		0xff008080u, 0xff800080u, 0xff404040u, 0xffffffffu,
++		0xff400000u, 0xff004000u, 0xff000040u, 0xff404000u,
++		0xff004040u, 0xff400040u, 0xff202020u, 0xffe0e0e0u
  	};
  
 -	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 127) {
++	if (args == NULL || stage > 135) {
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,19 +138,25 @@
+@@ -31,19 +140,27 @@
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
@@ -155,10 +157,12 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +	/* Keep every marker below 2 MiB: the bootstrap maps only the first
 +	 * 2 MiB of the framebuffer V=P, so y=380 would fault. */
 +	uint32_t y = stage < 28u ? 40u + (stage & 7u) * 20u :
-+	    220u + ((stage - 28u) & 7u) * 20u;
++	    (stage < 128u ? 220u + ((stage - 28u) & 7u) * 20u :
++	    220u + ((stage - 128u) & 7u) * 20u);
 +	uint32_t x = stage < 12u ? 300u : (stage < 16u ? 500u :
 +	    (stage < 20u ? 700u : (stage < 24u ? 900u :
-+	    (stage < 28u ? 1100u : 300u + ((stage < 80u ? stage - 28u : stage - 80u) / 8u) * 200u))));
++	    (stage < 28u ? 1100u : (stage < 128u ?
++	    300u + ((stage < 80u ? stage - 28u : stage - 80u) / 8u) * 200u : 300u)))));
  	for (uint32_t row = 0; row < 4; row++) {
  		volatile uint32_t *line = fb + (uint64_t)(y + row) * (stride / 4u);
  		for (uint32_t col = x; col < x + 128u; col++) {
@@ -753,7 +757,7 @@ diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
  #endif
  
  	assert(ml_get_interrupts_enabled() == FALSE);
-@@ -696,27 +740,32 @@
+@@ -696,30 +740,36 @@
  	 * interrupts or preemption enabled may begin enforcement.
  	 */
  	kernel_startup_initialize_upto(STARTUP_SUB_EARLY_BOOT);
@@ -786,6 +790,54 @@ diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
  #if CONFIG_VNGUARD
  	kernel_bootstrap_log("vnguard_policy_init");
  	vnguard_policy_init();
++	sweet_stage_mark(NULL, 125);
+ #endif
+ #endif
+ 
+@@ -745,6 +795,7 @@
+ #endif
+ 
+ 	kernel_startup_initialize_upto(STARTUP_SUB_LOCKDOWN);
++	sweet_stage_mark(NULL, 126);
+ 
+ 	/*
+ 	 * Get rid of segments used to bootstrap kext loading. This removes
+@@ -754,10 +805,12 @@
+ 	 */
+ 	kernel_bootstrap_log("OSKextRemoveKextBootstrap");
+ 	OSKextRemoveKextBootstrap();
++	sweet_stage_mark(NULL, 127);
+ 
+ 	/* No changes to kernel text and rodata beyond this point. */
+ 	kernel_bootstrap_log("machine_lockdown");
+ 	machine_lockdown();
++	sweet_stage_mark(NULL, 128);
+ 
+ #ifdef CONFIG_XNUPOST
+ 	kern_return_t result = kernel_list_tests();
+@@ -771,12 +824,14 @@
+ #ifdef  IOKIT
+ 	kernel_bootstrap_log("PE_lockdown_iokit");
+ 	PE_lockdown_iokit();
++	sweet_stage_mark(NULL, 129);
+ #endif
+ 	/*
+ 	 * max_cpus must be nailed down by the time PE_lockdown_iokit() finishes,
+ 	 * at the latest
+ 	 */
+ 	vm_set_restrictions(machine_info.max_cpus);
++	sweet_stage_mark(NULL, 130);
+ 
+ 
+ #if KPERF
+@@ -788,6 +843,7 @@
+ 	 */
+ #ifdef  MACH_BSD
+ 	bsd_init();
++	sweet_stage_mark(NULL, 131);
+ #endif
+ 
+ 
 diff --git a/osfmk/kern/thread_call.c b/osfmk/kern/thread_call.c
 --- a/osfmk/kern/thread_call.c
 +++ b/osfmk/kern/thread_call.c

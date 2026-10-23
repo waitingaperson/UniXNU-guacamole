@@ -367,7 +367,7 @@ diff -r C6/bsd/net/dlil.c B6/bsd/net/dlil.c
  	if_nexus_netif  nexus_netif;
 diff -r C6/bsd/net/if_loop.c B6/bsd/net/if_loop.c
 --- C6/bsd/net/if_loop.c	2026-10-23 23:17:10.520634531 +0800
-+++ B6/bsd/net/if_loop.c	2026-10-24 00:30:28.061487560 +0800
++++ B6/bsd/net/if_loop.c	2026-10-24 00:41:47.355003544 +0800
 @@ -633,12 +633,16 @@
  }
  
@@ -403,6 +403,14 @@ diff -r C6/bsd/net/if_loop.c B6/bsd/net/if_loop.c
  	if (result != 0) {
  		panic("%s: couldn't attach loopback ifnet (%d)",
  		    __func__, result);
+@@ -704,6 +711,7 @@
+ 	if_set_eflags(lo_ifp, IFEF_ECN_DISABLE);
+ 
+ 	bpfattach(lo_ifp, DLT_NULL, sizeof(u_int32_t));
++	sweet_stage_mark(NULL, 194);
+ }
+ 
+ static int
 diff -r C6/iokit/Kernel/IOMapper.cpp B6/iokit/Kernel/IOMapper.cpp
 --- C6/iokit/Kernel/IOMapper.cpp	2026-10-23 23:17:10.573633098 +0800
 +++ B6/iokit/Kernel/IOMapper.cpp	2026-10-23 23:17:10.875578152 +0800

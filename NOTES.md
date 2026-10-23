@@ -430,6 +430,12 @@
   forces `IOMapper::setMapperRequired(false)` (`mcl_paddr_base` becomes 0,
   i.e. physical-address passthrough).
 
+- r69 still stopped at 166: `IOMapper::gSystem` starts as `kUnknown` (1),
+  which carries the wait mask, and `IOPlatformExpert::start` (the only
+  `setMapperRequired` caller) runs after `mbinit`. r70 initializes `gSystem`
+  to `kNoMapper` (0) so early clients take the physical passthrough path; a
+  real `IOMapper::start()` still overwrites it.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

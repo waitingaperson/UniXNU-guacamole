@@ -416,6 +416,12 @@
   `__private_extern__ void`, and two markers landed in `mbuf_mtypes_sync`.
   r67 fixes both and places markers 160-172 across `mbinit`.
 
+- r67 still showed 157 because `sweet_stage_mark` returns early for
+  `stage > 159` (the color table has 160 entries), so the `mbinit` markers
+  never drew. r68 draws the number for stages past 159 and inserts markers
+  173-177 at `mbinit` entry, after `microuptime` and after each
+  `read_random`, which bisects the first lines of `mbinit`.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

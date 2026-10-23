@@ -1250,3 +1250,102 @@ diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
  			break;
  		}
  		rootdevice[0] = '\0';
+diff --git a/bsd/kern/uipc_mbuf.c b/bsd/kern/uipc_mbuf.c
+--- a/bsd/kern/uipc_mbuf.c
++++ b/bsd/kern/uipc_mbuf.c
+@@ -1074,13 +1074,14 @@
+ 	}
+ 
+ 	if (!locked) {
+-		lck_mtx_lock(mbuf_mlock);
++		sweet_stage_mark(NULL, 168);
+ 	}
+ 	for (int n = 0; n < MT_MAX; n++) {
+ 		mbstat.m_mtypes[n] = mtc.cpu_mtypes[n];
+ 	}
+ 	if (!locked) {
+ 		lck_mtx_unlock(mbuf_mlock);
++	sweet_stage_mark(NULL, 170);
+ 	}
+ }
+ 
+@@ -1553,6 +1554,8 @@
+ }
+ 
+ __private_extern__ void
++extern void sweet_stage_mark(struct boot_args *args, unsigned int stage);
++
+ mbinit(void)
+ {
+ 	unsigned int m;
+@@ -1643,6 +1646,7 @@
+ 	read_random(&mb_obscure_extfree, sizeof(mb_obscure_extfree));
+ 	mb_obscure_extref |= 0x3;
+ 	mb_obscure_extfree |= 0x3;
++	sweet_stage_mark(NULL, 160);
+ 
+ 	/* Make sure we don't save more than we should */
+ 	_CASSERT(MCA_SAVED_MBUF_SIZE <= sizeof(struct mbuf));
+@@ -1656,6 +1660,7 @@
+ 
+ 	/* Setup the mbuf table */
+ 	mbuf_table_init();
++	sweet_stage_mark(NULL, 161);
+ 
+ 	/*
+ 	 * Allocate cluster slabs table:
+@@ -1669,6 +1674,7 @@
+ 	    (P2ROUNDUP(nmbclusters, (MBSIZE >> MCLSHIFT)) << MCLSHIFT) >> MBSHIFT;
+ 	slabstbl = zalloc_permanent(maxslabgrp * sizeof(mcl_slabg_t *),
+ 	    ZALIGN(mcl_slabg_t));
++	sweet_stage_mark(NULL, 162);
+ 
+ 	/*
+ 	 * Allocate audit structures, if needed:
+@@ -1702,6 +1708,7 @@
+ 	/* Enable mbuf leak logging, with a lock to protect the tables */
+ 
+ 	mleak_activate();
++	sweet_stage_mark(NULL, 163);
+ 
+ 	/*
+ 	 * Allocate structure for per-CPU statistics that's aligned
+@@ -1710,18 +1717,22 @@
+ 	 * before alignment is not saved.
+ 	 */
+ 	ncpu = ml_wait_max_cpus();
++	sweet_stage_mark(NULL, 164);
+ 
+ 	/* Calculate the number of pages assigned to the cluster pool */
+ 	mcl_pages = (nmbclusters << MCLSHIFT) / PAGE_SIZE;
+ 	mcl_paddr = zalloc_permanent(mcl_pages * sizeof(ppnum_t),
+ 	    ZALIGN(ppnum_t));
++	sweet_stage_mark(NULL, 165);
+ 
+ 	/* Register with the I/O Bus mapper */
+ 	mcl_paddr_base = IOMapperIOVMAlloc(mcl_pages);
++	sweet_stage_mark(NULL, 166);
+ 
+ 	embutl = (mbutl + (nmbclusters * MCLBYTES));
+ 	VERIFY(((embutl - mbutl) % MBIGCLBYTES) == 0);
+ 
++	sweet_stage_mark(NULL, 167);
+ 	/* Prime up the freelist */
+ 	PE_parse_boot_argn("initmcl", &initmcl, sizeof(initmcl));
+ 	if (initmcl != 0) {
+@@ -1742,6 +1753,7 @@
+ 	 */
+ 	VERIFY(m_total(MC_BIGCL) == 0 && m_minlimit(MC_BIGCL) != 0);
+ 	freelist_populate(m_class(MC_BIGCL), initmcl, M_WAIT);
++	sweet_stage_mark(NULL, 169);
+ 	VERIFY(m_total(MC_BIGCL) >= m_minlimit(MC_BIGCL));
+ 	freelist_init(m_class(MC_CL));
+ 
+@@ -1761,6 +1773,7 @@
+ 	    NULL, &thread);
+ 	thread_deallocate(thread);
+ 
++	sweet_stage_mark(NULL, 171);
+ 	ref_cache = mcache_create("mext_ref", sizeof(struct ext_ref),
+ 	    0, 0, MCR_SLEEP);
+ 

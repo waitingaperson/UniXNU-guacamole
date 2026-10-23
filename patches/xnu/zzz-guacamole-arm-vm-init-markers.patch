@@ -819,7 +819,7 @@ diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
  
  #ifdef CONFIG_XNUPOST
  	kern_return_t result = kernel_list_tests();
-@@ -771,12 +824,14 @@
+@@ -771,23 +824,30 @@
  #ifdef  IOKIT
  	kernel_bootstrap_log("PE_lockdown_iokit");
  	PE_lockdown_iokit();
@@ -834,7 +834,15 @@ diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
  
  
  #if KPERF
-@@ -788,6 +843,7 @@
++	sweet_stage_mark(NULL, 146);
++#if defined(APPLE_ARM64_ARCH_FAMILY)
+ 	kperf_init_early();
+ #endif
++	sweet_stage_mark(NULL, 147);
++#endif
+ 
+ 	/*
+ 	 *	Start the user bootstrap.
  	 */
  #ifdef  MACH_BSD
  	bsd_init();

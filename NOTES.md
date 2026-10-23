@@ -436,6 +436,13 @@
   to `kNoMapper` (0) so early clients take the physical passthrough path; a
   real `IOMapper::start()` still overwrites it.
 
+- **r70 reaches stage 153.** `mbinit` and the following kqueue/event/aio/pthread/
+  pshm/psem inits pass; the hang is between 153 and 154, i.e. `nwk_wq_init()`
+  or `dlil_init()`. `dlil_init` creates its input/detacher threads and then
+  `msleep`s until each has run once (`dlil_pending_thread_cnt`). r71 marks the
+  dlil thread entry (178), the pending-count decrement (179) and the wait
+  (180/181) to tell scheduler failure from a thread-side panic.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

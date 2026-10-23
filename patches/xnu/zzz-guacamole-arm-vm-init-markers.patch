@@ -1,7 +1,7 @@
 diff -r C6/bsd/kern/bsd_init.c B6/bsd/kern/bsd_init.c
 --- C6/bsd/kern/bsd_init.c	2026-10-23 23:17:10.490635342 +0800
-+++ B6/bsd/kern/bsd_init.c	2026-10-24 00:30:28.062561301 +0800
-@@ -486,9 +486,17 @@
++++ B6/bsd/kern/bsd_init.c	2026-10-24 00:52:38.565175294 +0800
+@@ -486,11 +486,19 @@
  	boolean_t       netboot = FALSE;
  #endif
  
@@ -17,8 +17,11 @@ diff -r C6/bsd/kern/bsd_init.c B6/bsd/kern/bsd_init.c
 +		sweet_stage_mark(NULL, 142);
 +	}
  
- #define DEBUG_BSDINIT 0
+-#define DEBUG_BSDINIT 0
++#define DEBUG_BSDINIT 1
  
+ #if DEBUG_BSDINIT
+ #define bsd_init_kprintf(x, ...) kprintf("bsd_init: " x, ## __VA_ARGS__)
 @@ -499,17 +507,21 @@
  #endif
  

@@ -446,7 +446,7 @@ diff -r C6/iokit/Kernel/IOPlatformExpert.cpp B6/iokit/Kernel/IOPlatformExpert.cp
  
 diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
 --- C6/osfmk/arm/arm_init.c	2026-10-23 23:33:18.159317562 +0800
-+++ B6/osfmk/arm/arm_init.c	2026-10-23 23:17:10.875369607 +0800
++++ B6/osfmk/arm/arm_init.c	2026-10-23 23:38:01.786779782 +0800
 @@ -347,6 +347,8 @@
  	DTEntry chosen = NULL;
  	unsigned int dt_entry_size = 0;
@@ -486,10 +486,16 @@ diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
  
  	/* Start serial if requested and a serial device was enumerated in serial_init(). */
  	if ((serialmode & SERIALMODE_OUTPUT) && serial_exists) {
-@@ -592,9 +599,11 @@
+@@ -592,9 +599,17 @@
  		disableConsoleOutput = FALSE;     /* Allow printfs to happen */
  	}
  	PE_create_console();
++	/*
++	 * The screen acquire below runs in graphics mode, which disables the
++	 * kernel text console (gc_enable(FALSE)). Ask for the text screen now so
++	 * kprintf output is drawn on the framebuffer during bring-up.
++	 */
++	PE_initialize_console(&PE_state.video, kPETextScreen);
 +	sweet_stage_mark(args, 32);
  
  	/* setup console output */
@@ -498,7 +504,7 @@ diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
  
  #if __arm64__
  #if DEBUG
-@@ -603,8 +612,10 @@
+@@ -603,8 +618,10 @@
  #endif
  
  	cpu_machine_idle_init(TRUE);
@@ -509,7 +515,7 @@ diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
  
  #if __arm64__
  	extern bool cpu_config_correct;
-@@ -613,6 +624,7 @@
+@@ -613,6 +630,7 @@
  	}
  
  	ml_map_cpu_pio();
@@ -517,7 +523,7 @@ diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
  
  #if APPLE_ARM64_ARCH_FAMILY
  	configure_late_apple_regs();
-@@ -621,6 +633,7 @@
+@@ -621,6 +639,7 @@
  #endif
  
  	cpu_timebase_init(TRUE);
@@ -525,7 +531,7 @@ diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
  
  #if KPERF
  	/* kptimer_curcpu_up() must be called after cpu_timebase_init */
-@@ -628,7 +641,9 @@
+@@ -628,7 +647,9 @@
  #endif /* KPERF */
  
  	PE_init_cpu();
@@ -535,7 +541,7 @@ diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
  
  
  #if HIBERNATION
-@@ -654,9 +669,11 @@
+@@ -654,9 +675,11 @@
  	if (SecureDTGetProperty(chosen, "dram-size", (void const **)&dram_size, &dt_entry_size) != kSuccess) {
  		panic("%s: Unable to find 'dram-size' entry in the 'chosen' DT node", __FUNCTION__);
  	}
@@ -547,7 +553,7 @@ diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
  
  	/*
  	 * Initialize the stack protector for all future calls
-@@ -670,6 +687,7 @@
+@@ -670,6 +693,7 @@
  	 * against string vulnerabilities
  	 */
  	__stack_chk_guard &= ~(0xFFULL << 8);

@@ -997,7 +997,20 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  }
  
  #define kShutdownTimeout    30 //in secs
-@@ -2130,7 +2132,9 @@
+@@ -153,8 +155,10 @@
+ 	}
+ 
+ 	// Register the presence or lack thereof a system
+-	// PCI address mapper with the IOMapper class
+-	IOMapper::setMapperRequired(NULL != getProperty(kIOPlatformMapperPresentKey));
++	// PCI address mapper with the IOMapper class.
++	// Native ports have no DART/IOMMU mapper; declaring one present makes
++	// mbinit's IOMapperIOVMAlloc wait forever in waitForSystemMapper().
++	IOMapper::setMapperRequired(false);
+ 
+ 	gIOInterruptControllers = OSDictionary::withCapacity(1);
+ 	gIOInterruptControllersLock = IOLockAlloc();
+@@ -2130,7 +2134,9 @@
  void
  IOPlatformExpertDevice::configureDefaults( void )
  {
@@ -1007,7 +1020,7 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  	// Parse the serial-number data and publish a user-readable string
  	OSData* mydata = (OSData*) (getProperty("serial-number"));
  	if (mydata != NULL) {
-@@ -2140,7 +2144,14 @@
+@@ -2140,7 +2146,14 @@
  			serNoString->release();
  		}
  	}
@@ -1022,7 +1035,7 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  }
  
  void
-@@ -2156,6 +2167,7 @@
+@@ -2156,6 +2169,7 @@
  	if (options == NULL) {
  		return; // /options may not be present
  	}
@@ -1030,7 +1043,7 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  
  	assert(gIOOptionsEntry == NULL);
  	gIOOptionsEntry = new IODTNVRAM;
-@@ -2165,6 +2177,7 @@
+@@ -2165,6 +2179,7 @@
  	gIOOptionsEntry->init(options, gIODTPlane);
  	gIOOptionsEntry->attach(this);
  	gIOOptionsEntry->start(this);
@@ -1038,7 +1051,7 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  	options->release();
  }
  
-@@ -2176,15 +2189,19 @@
+@@ -2176,15 +2191,19 @@
  	uuid_string_t     uuid;
  
  #if !defined(__x86_64__)
@@ -1058,7 +1071,7 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  			if (data2 && data2->getLength() == 4) {
  				SHA1_CTX     context;
  				uint8_t      digest[SHA_DIGEST_LENGTH];
-@@ -2195,17 +2212,20 @@
+@@ -2195,17 +2214,20 @@
  				SHA1Update( &context, data1->getBytesNoCopy(), data1->getLength());
  				SHA1Update( &context, data2->getBytesNoCopy(), data2->getLength());
  				SHA1Final( digest, &context );

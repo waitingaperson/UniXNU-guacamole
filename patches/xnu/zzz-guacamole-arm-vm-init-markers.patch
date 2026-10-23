@@ -989,7 +989,14 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
 diff --git a/osfmk/prng/prng_random.c b/osfmk/prng/prng_random.c
 --- a/osfmk/prng/prng_random.c
 +++ b/osfmk/prng/prng_random.c
-@@ -445,7 +445,12 @@
+@@ -441,11 +441,18 @@
+ 	};
+ 	uint32_t mode = 0;
+ 
+-	if (PE_parse_boot_argn("fips_mode", &mode, sizeof(mode)) && mode != 0) {
++	/* fips_mode=4 (FIPS_MODE_FLAG_DISABLE) skips the POST; allow it. */
++	if (PE_parse_boot_argn("fips_mode", &mode, sizeof(mode)) && mode != 0 &&
++	    (mode & 0x4) == 0) {
  		panic("source corecrypto verification requires complete default POST");
  	}
  	info.address = (vm_address_t)&_mh_execute_header;

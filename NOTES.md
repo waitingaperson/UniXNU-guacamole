@@ -332,6 +332,14 @@
   call into unregistered crypto. The UUID can be generated after
   `EARLY_BOOT` once the crypto start is understood.
 
+- **r56 reaches stage 97.** The digit shows 97, so `PE_init_iokit` returns
+  with the UUID skipped; stage 98 (`STARTUP_SUB_EARLY_BOOT`) never appears.
+  The crypto bootstrap is the first EARLY_BOOT entry, so the remaining hang
+  is most likely inside `corecrypto_kext_start` (FIPS POST or the sysctl
+  registration).
+- r57 marks around `corecrypto_kext_start` (123/124) and switches the UUID
+  guard to `!APPLE_ARM64_ARCH_FAMILY`.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

@@ -1,7 +1,7 @@
 diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 --- a/osfmk/arm64/sweet_stage.c
 +++ b/osfmk/arm64/sweet_stage.c
-@@ -1,25 +1,134 @@
+@@ -1,25 +1,136 @@
  /*
   * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
   * of the boot framebuffer V=P, so these writes work from C with the MMU on
@@ -98,7 +98,7 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +	if (args == NULL) {
 +		args = sweet_stage_args;
 +	}
-+	static const uint32_t colors[136] = {
++	static const uint32_t colors[144] = {
  		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
  		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
  		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
@@ -133,15 +133,17 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +		0xff800000u, 0xff008000u, 0xff000080u, 0xff808000u,
 +		0xff008080u, 0xff800080u, 0xff404040u, 0xffffffffu,
 +		0xff400000u, 0xff004000u, 0xff000040u, 0xff404000u,
-+		0xff004040u, 0xff400040u, 0xff202020u, 0xffe0e0e0u
++		0xff004040u, 0xff400040u, 0xff202020u, 0xffe0e0e0u,
++		0xffc00000u, 0xff00c000u, 0xff0000c0u, 0xffc0c000u,
++		0xff00c0c0u, 0xffc000c0u, 0xff808000u, 0xff008080u
  	};
  
 -	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 135) {
++	if (args == NULL || stage > 143) {
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,19 +140,27 @@
+@@ -31,19 +142,27 @@
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
@@ -1062,3 +1064,70 @@ diff --git a/osfmk/prng/prng_random.c b/osfmk/prng/prng_random.c
  	if (source_corecrypto14_status != KERN_SUCCESS) {
  		panic("source corecrypto initialization failed: %d", source_corecrypto14_status);
  	}
+diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -510,6 +510,7 @@
+ 	/* Initialize kauth subsystem before instancing the first credential */
+ 	bsd_init_kprintf("calling kauth_init\n");
+ 	kauth_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 132); }
+ 
+ 	/* kernel_task->proc = kernproc; */
+ 	set_bsdtask_info(kernel_task, (void *)kernproc);
+@@ -568,6 +569,7 @@
+ 	 * Initialize the MAC Framework
+ 	 */
+ 	mac_policy_initbsd();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 133); }
+ 
+ #if defined (__i386__) || defined (__x86_64__)
+ 	/*
+@@ -680,16 +682,19 @@
+ 	 */
+ 	bsd_init_kprintf("calling bsd_bufferinit\n");
+ 	bsd_bufferinit();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 134); }
+ 
+ 	/*
+ 	 * Initialize the calendar.
+ 	 */
+ 	bsd_init_kprintf("calling IOKitInitializeTime\n");
+ 	IOKitInitializeTime();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 135); }
+ 
+ 	/* Initialize the file systems. */
+ 	bsd_init_kprintf("calling vfsinit\n");
+ 	vfsinit();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 136); }
+ 
+ #if CONFIG_PROC_UUID_POLICY
+ 	/* Initial proc_uuid_policy subsystem */
+@@ -784,9 +789,11 @@
+ 
+ 	bsd_init_kprintf("calling sysctl_mib_init\n");
+ 	sysctl_mib_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 137); }
+ 
+ 	bsd_init_kprintf("calling bsd_autoconf\n");
+ 	bsd_autoconf();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 138); }
+ 
+ #if CONFIG_DTRACE
+ 	dtrace_postinit();
+@@ -862,12 +869,14 @@
+ 
+ 		bsd_init_kprintf("calling setconf\n");
+ 		setconf();
++		{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 139); }
+ #if CONFIG_NETBOOT
+ 		netboot = (mountroot == netboot_mountroot);
+ #endif
+ 
+ 		bsd_init_kprintf("vfs_mountroot\n");
+ 		if (0 == (err = vfs_mountroot())) {
++			{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 140); }
+ 			break;
+ 		}
+ 		rootdevice[0] = '\0';
+diff --git a/bsd/dev/sweet_ufs.c b/bsd/dev/sweet_ufs.c

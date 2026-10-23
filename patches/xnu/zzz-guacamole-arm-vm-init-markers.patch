@@ -1253,32 +1253,16 @@ diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
 diff --git a/bsd/kern/uipc_mbuf.c b/bsd/kern/uipc_mbuf.c
 --- a/bsd/kern/uipc_mbuf.c
 +++ b/bsd/kern/uipc_mbuf.c
-@@ -1074,13 +1074,14 @@
- 	}
- 
- 	if (!locked) {
--		lck_mtx_lock(mbuf_mlock);
-+		sweet_stage_mark(NULL, 168);
- 	}
- 	for (int n = 0; n < MT_MAX; n++) {
- 		mbstat.m_mtypes[n] = mtc.cpu_mtypes[n];
- 	}
- 	if (!locked) {
- 		lck_mtx_unlock(mbuf_mlock);
-+	sweet_stage_mark(NULL, 170);
- 	}
+@@ -1552,6 +1552,8 @@
+ 	return n;
  }
  
-@@ -1553,6 +1554,8 @@
- }
- 
- __private_extern__ void
-+extern void sweet_stage_mark(struct boot_args *args, unsigned int stage);
++extern void sweet_stage_mark(void *args, unsigned int stage);
 +
+ __private_extern__ void
  mbinit(void)
  {
- 	unsigned int m;
-@@ -1643,6 +1646,7 @@
+@@ -1643,6 +1645,7 @@
  	read_random(&mb_obscure_extfree, sizeof(mb_obscure_extfree));
  	mb_obscure_extref |= 0x3;
  	mb_obscure_extfree |= 0x3;
@@ -1286,11 +1270,17 @@ diff --git a/bsd/kern/uipc_mbuf.c b/bsd/kern/uipc_mbuf.c
  
  	/* Make sure we don't save more than we should */
  	_CASSERT(MCA_SAVED_MBUF_SIZE <= sizeof(struct mbuf));
-@@ -1656,6 +1660,7 @@
+@@ -1651,11 +1654,13 @@
+ 		nmbclusters = NMBCLUSTERS;
+ 	}
+ 
++	sweet_stage_mark(NULL, 161);
+ 	/* This should be a sane (at least even) value by now */
+ 	VERIFY(nmbclusters != 0 && !(nmbclusters & 0x1));
  
  	/* Setup the mbuf table */
  	mbuf_table_init();
-+	sweet_stage_mark(NULL, 161);
++	sweet_stage_mark(NULL, 162);
  
  	/*
  	 * Allocate cluster slabs table:
@@ -1298,7 +1288,7 @@ diff --git a/bsd/kern/uipc_mbuf.c b/bsd/kern/uipc_mbuf.c
  	    (P2ROUNDUP(nmbclusters, (MBSIZE >> MCLSHIFT)) << MCLSHIFT) >> MBSHIFT;
  	slabstbl = zalloc_permanent(maxslabgrp * sizeof(mcl_slabg_t *),
  	    ZALIGN(mcl_slabg_t));
-+	sweet_stage_mark(NULL, 162);
++	sweet_stage_mark(NULL, 163);
  
  	/*
  	 * Allocate audit structures, if needed:
@@ -1306,7 +1296,7 @@ diff --git a/bsd/kern/uipc_mbuf.c b/bsd/kern/uipc_mbuf.c
  	/* Enable mbuf leak logging, with a lock to protect the tables */
  
  	mleak_activate();
-+	sweet_stage_mark(NULL, 163);
++	sweet_stage_mark(NULL, 164);
  
  	/*
  	 * Allocate structure for per-CPU statistics that's aligned
@@ -1314,38 +1304,52 @@ diff --git a/bsd/kern/uipc_mbuf.c b/bsd/kern/uipc_mbuf.c
  	 * before alignment is not saved.
  	 */
  	ncpu = ml_wait_max_cpus();
-+	sweet_stage_mark(NULL, 164);
++	sweet_stage_mark(NULL, 165);
  
  	/* Calculate the number of pages assigned to the cluster pool */
  	mcl_pages = (nmbclusters << MCLSHIFT) / PAGE_SIZE;
  	mcl_paddr = zalloc_permanent(mcl_pages * sizeof(ppnum_t),
  	    ZALIGN(ppnum_t));
-+	sweet_stage_mark(NULL, 165);
++	sweet_stage_mark(NULL, 166);
  
  	/* Register with the I/O Bus mapper */
  	mcl_paddr_base = IOMapperIOVMAlloc(mcl_pages);
-+	sweet_stage_mark(NULL, 166);
++	sweet_stage_mark(NULL, 167);
  
  	embutl = (mbutl + (nmbclusters * MCLBYTES));
  	VERIFY(((embutl - mbutl) % MBIGCLBYTES) == 0);
  
-+	sweet_stage_mark(NULL, 167);
++	sweet_stage_mark(NULL, 168);
  	/* Prime up the freelist */
  	PE_parse_boot_argn("initmcl", &initmcl, sizeof(initmcl));
  	if (initmcl != 0) {
-@@ -1742,6 +1753,7 @@
+@@ -1734,6 +1745,7 @@
+ 		initmcl = m_minlimit(MC_BIGCL);
+ 	}
+ 
++	sweet_stage_mark(NULL, 169);
+ 	lck_mtx_lock(mbuf_mlock);
+ 
+ 	/*
+@@ -1742,6 +1754,7 @@
  	 */
  	VERIFY(m_total(MC_BIGCL) == 0 && m_minlimit(MC_BIGCL) != 0);
  	freelist_populate(m_class(MC_BIGCL), initmcl, M_WAIT);
-+	sweet_stage_mark(NULL, 169);
++	sweet_stage_mark(NULL, 170);
  	VERIFY(m_total(MC_BIGCL) >= m_minlimit(MC_BIGCL));
  	freelist_init(m_class(MC_CL));
  
-@@ -1761,6 +1773,7 @@
+@@ -1756,11 +1769,13 @@
+ 	mb_peak_newreport = FALSE;
+ 
+ 	lck_mtx_unlock(mbuf_mlock);
++	sweet_stage_mark(NULL, 171);
+ 
+ 	(void) kernel_thread_start((thread_continue_t)mbuf_worker_thread_init,
  	    NULL, &thread);
  	thread_deallocate(thread);
  
-+	sweet_stage_mark(NULL, 171);
++	sweet_stage_mark(NULL, 172);
  	ref_cache = mcache_create("mext_ref", sizeof(struct ext_ref),
  	    0, 0, MCR_SLEEP);
  

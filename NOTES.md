@@ -385,6 +385,14 @@
 - r62 marks it (146/147) and skips `kperf_init_early()` on non-Apple builds
   (`APPLE_ARM64_ARCH_FAMILY`).
 
+- **r62 reaches stage 136.** The kperf skip lets `bsd_init` run: 141-145
+  and 132-136 (kauth, MAC, bufferinit, IOKit time, vfsinit) all draw. The
+  hang is between `vfsinit()` and `sysctl_mib_init()` (stage 137):
+  `proc_uuid_policy_init`, `mcache_init`/`mbinit`, `knote_init`,
+  `eventhandler_init`, `aio_init`, `pthread_init`, `pshm/psem_cache_init`,
+  `dlil_init`, `socketinit` or `domaininit`.
+- r63 marks those as stages 148-157.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

@@ -464,6 +464,10 @@
   AppleCLCD does not take over the display and hide the kernel console; GPU
   work is deferred. Restore it when the console is no longer needed.
 
+- The console "freeze" at the fsw line is not a hang: `DEBUG_BSDINIT` is 0, so
+  every `bsd_init_kprintf` is a no-op. r79 sets it to 1, printing each
+  `bsd_init` step to the framebuffer console alongside the 189-194 markers.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

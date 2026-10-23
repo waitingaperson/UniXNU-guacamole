@@ -919,7 +919,7 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  		}
  	}
 +	sweet_stage_mark(NULL, 112);
-+#if defined(BCM2837)
++#if !defined(APPLE_ARM64_ARCH_FAMILY)
 +	/* The source corecrypto registration runs at EARLY_BOOT, after this
 +	 * point; the platform UUID is generated once crypto is available. */
 +#else
@@ -987,3 +987,19 @@ diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.c
  	OSData * data;
  
 diff --git a/osfmk/prng/prng_random.c b/osfmk/prng/prng_random.c
+--- a/osfmk/prng/prng_random.c
++++ b/osfmk/prng/prng_random.c
+@@ -445,7 +445,12 @@
+ 		panic("source corecrypto verification requires complete default POST");
+ 	}
+ 	info.address = (vm_address_t)&_mh_execute_header;
+-	source_corecrypto14_status = corecrypto_kext_start(&info, NULL);
++	{
++		extern void sweet_stage_mark(boot_args *args, unsigned int stage);
++		sweet_stage_mark(NULL, 123);
++		source_corecrypto14_status = corecrypto_kext_start(&info, NULL);
++		sweet_stage_mark(NULL, 124);
++	}
+ 	if (source_corecrypto14_status != KERN_SUCCESS) {
+ 		panic("source corecrypto initialization failed: %d", source_corecrypto14_status);
+ 	}

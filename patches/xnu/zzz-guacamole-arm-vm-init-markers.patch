@@ -19,7 +19,7 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
  
 +static boot_args *sweet_stage_args;
 +
- void
++void
 +sweet_stage_set_args(boot_args *args)
 +{
 +	sweet_stage_args = args;
@@ -91,7 +91,7 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +	__asm__ volatile ("dsb sy" ::: "memory");
 +}
 +
-+void
+ void
  sweet_stage_mark(boot_args *args, unsigned int stage)
  {
 -	static const uint32_t colors[16] = {
@@ -143,11 +143,21 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
  	};
  
 -	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 159) {
++	if (args == NULL || stage > 999) {
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,19 +146,27 @@
+@@ -28,22 +143,37 @@
+ 		return;
+ 	}
+ 	volatile uint32_t *fb = (volatile uint32_t *)(uintptr_t)base;
++	/* Extended stages only need the number; the 160-entry color table and
++	 * the block band stop at 159. */
++	if (stage > 159) {
++		sweet_stage_number(args, stage);
++		__asm__ volatile ("dsb sy" ::: "memory");
++		return;
++	}
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
@@ -1262,15 +1272,32 @@ diff --git a/bsd/kern/uipc_mbuf.c b/bsd/kern/uipc_mbuf.c
  __private_extern__ void
  mbinit(void)
  {
-@@ -1643,6 +1645,7 @@
+@@ -1559,7 +1561,9 @@
+ 	unsigned int initmcl = 0;
+ 	thread_t thread = THREAD_NULL;
+ 
++	sweet_stage_mark(NULL, 173);
+ 	microuptime(&mb_start);
++	sweet_stage_mark(NULL, 174);
+ 
+ 	/*
+ 	 * These MBUF_ values must be equal to their private counterparts.
+@@ -1639,10 +1643,14 @@
+ 	_CASSERT(sizeof(mb_redzone_cookie) ==
+ 	    sizeof(((struct pkthdr *)0)->redzone));
+ 	read_random(&mb_redzone_cookie, sizeof(mb_redzone_cookie));
++	sweet_stage_mark(NULL, 175);
+ 	read_random(&mb_obscure_extref, sizeof(mb_obscure_extref));
++	sweet_stage_mark(NULL, 176);
  	read_random(&mb_obscure_extfree, sizeof(mb_obscure_extfree));
++	sweet_stage_mark(NULL, 177);
  	mb_obscure_extref |= 0x3;
  	mb_obscure_extfree |= 0x3;
 +	sweet_stage_mark(NULL, 160);
  
  	/* Make sure we don't save more than we should */
  	_CASSERT(MCA_SAVED_MBUF_SIZE <= sizeof(struct mbuf));
-@@ -1651,11 +1654,13 @@
+@@ -1651,11 +1659,13 @@
  		nmbclusters = NMBCLUSTERS;
  	}
  
@@ -1284,7 +1311,7 @@ diff --git a/bsd/kern/uipc_mbuf.c b/bsd/kern/uipc_mbuf.c
  
  	/*
  	 * Allocate cluster slabs table:
-@@ -1669,6 +1674,7 @@
+@@ -1669,6 +1679,7 @@
  	    (P2ROUNDUP(nmbclusters, (MBSIZE >> MCLSHIFT)) << MCLSHIFT) >> MBSHIFT;
  	slabstbl = zalloc_permanent(maxslabgrp * sizeof(mcl_slabg_t *),
  	    ZALIGN(mcl_slabg_t));
@@ -1292,7 +1319,7 @@ diff --git a/bsd/kern/uipc_mbuf.c b/bsd/kern/uipc_mbuf.c
  
  	/*
  	 * Allocate audit structures, if needed:
-@@ -1702,6 +1708,7 @@
+@@ -1702,6 +1713,7 @@
  	/* Enable mbuf leak logging, with a lock to protect the tables */
  
  	mleak_activate();
@@ -1300,7 +1327,7 @@ diff --git a/bsd/kern/uipc_mbuf.c b/bsd/kern/uipc_mbuf.c
  
  	/*
  	 * Allocate structure for per-CPU statistics that's aligned
-@@ -1710,18 +1717,22 @@
+@@ -1710,18 +1722,22 @@
  	 * before alignment is not saved.
  	 */
  	ncpu = ml_wait_max_cpus();
@@ -1323,7 +1350,7 @@ diff --git a/bsd/kern/uipc_mbuf.c b/bsd/kern/uipc_mbuf.c
  	/* Prime up the freelist */
  	PE_parse_boot_argn("initmcl", &initmcl, sizeof(initmcl));
  	if (initmcl != 0) {
-@@ -1734,6 +1745,7 @@
+@@ -1734,6 +1750,7 @@
  		initmcl = m_minlimit(MC_BIGCL);
  	}
  
@@ -1331,7 +1358,7 @@ diff --git a/bsd/kern/uipc_mbuf.c b/bsd/kern/uipc_mbuf.c
  	lck_mtx_lock(mbuf_mlock);
  
  	/*
-@@ -1742,6 +1754,7 @@
+@@ -1742,6 +1759,7 @@
  	 */
  	VERIFY(m_total(MC_BIGCL) == 0 && m_minlimit(MC_BIGCL) != 0);
  	freelist_populate(m_class(MC_BIGCL), initmcl, M_WAIT);
@@ -1339,7 +1366,7 @@ diff --git a/bsd/kern/uipc_mbuf.c b/bsd/kern/uipc_mbuf.c
  	VERIFY(m_total(MC_BIGCL) >= m_minlimit(MC_BIGCL));
  	freelist_init(m_class(MC_CL));
  
-@@ -1756,11 +1769,13 @@
+@@ -1756,11 +1774,13 @@
  	mb_peak_newreport = FALSE;
  
  	lck_mtx_unlock(mbuf_mlock);

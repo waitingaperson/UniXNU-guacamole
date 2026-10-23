@@ -1,196 +1,580 @@
-diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
---- a/osfmk/arm64/sweet_stage.c
-+++ b/osfmk/arm64/sweet_stage.c
-@@ -1,25 +1,140 @@
- /*
-  * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
-  * of the boot framebuffer V=P, so these writes work from C with the MMU on
-- * and without any IOKit driver. Each stage is a 128x4 block at x=300,
-- * y=40+stage*20; stage 0 is the C entry and stage 7 is immediately before
-+ * and without any IOKit driver. Stages are 128x4 blocks at
-+ * y=40+(stage&7)*20, one column per group: 0-11 x=300, 12-15 x=500,
-+ * 16-19 x=700, 20-23 x=900, 24-27 x=1100. Stages 28+ use a second band at
-+ * y=220+(stage&7)*20, x=300 for 28-35. Stage 7 is immediately before
-  * arm_vm_init tears down the bootstrap TTBR0.
-  */
- #include <pexpert/pexpert.h>
- #include <pexpert/arm64/boot.h>
- #include <stdint.h>
+diff -r C6/bsd/kern/bsd_init.c B6/bsd/kern/bsd_init.c
+--- C6/bsd/kern/bsd_init.c	2026-10-23 23:17:10.490635342 +0800
++++ B6/bsd/kern/bsd_init.c	2026-10-23 23:17:10.875578152 +0800
+@@ -486,9 +486,17 @@
+ 	boolean_t       netboot = FALSE;
+ #endif
  
-+static boot_args *sweet_stage_args;
-+
-+void
-+sweet_stage_set_args(boot_args *args)
-+{
-+	sweet_stage_args = args;
-+}
-+
-+
-+/* 5x7 digits, drawn at 10x so the last stage is readable in a photo. */
-+static const uint8_t sweet_digits[10][7] = {
-+	{ 0x0e, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0e },
-+	{ 0x04, 0x0c, 0x04, 0x04, 0x04, 0x04, 0x0e },
-+	{ 0x0e, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1f },
-+	{ 0x1f, 0x02, 0x04, 0x02, 0x01, 0x11, 0x0e },
-+	{ 0x02, 0x06, 0x0a, 0x12, 0x1f, 0x02, 0x02 },
-+	{ 0x1f, 0x10, 0x1e, 0x01, 0x01, 0x11, 0x0e },
-+	{ 0x06, 0x08, 0x10, 0x1e, 0x11, 0x11, 0x0e },
-+	{ 0x1f, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08 },
-+	{ 0x0e, 0x11, 0x11, 0x0e, 0x11, 0x11, 0x0e },
-+	{ 0x0e, 0x11, 0x11, 0x0f, 0x01, 0x02, 0x0c },
-+};
-+
-+static void
-+sweet_stage_number(boot_args *args, unsigned int stage)
-+{
-+	uint64_t base = args->Video.v_baseAddr;
-+	uint32_t stride = (uint32_t)args->Video.v_rowBytes;
-+	const uint32_t scale = 10;
-+	const uint32_t ox = 16, oy = 16;
-+	uint32_t digits[3];
-+	unsigned int n = 0, v = stage;
-+
-+	if (base == 0 || stride < 4) {
-+		return;
++	{
++		extern void sweet_stage_mark(boot_args *args, unsigned int stage);
++		sweet_stage_mark(NULL, 141);
 +	}
-+	volatile uint32_t *fb = (volatile uint32_t *)(uintptr_t)base;
-+
-+	for (uint32_t y = 0; y < 8 * scale; y++) {
-+		volatile uint32_t *line = fb + (uint64_t)(oy + y) * (stride / 4u);
-+		for (uint32_t x = 0; x < 3 * 6 * scale; x++) {
-+			line[ox + x] = 0;
-+		}
+ #if (DEVELOPMENT || DEBUG)
+ 	platform_stall_panic_or_spin(PLATFORM_STALL_XNU_LOCATION_BSD_INIT);
+ #endif
++	{
++		extern void sweet_stage_mark(boot_args *args, unsigned int stage);
++		sweet_stage_mark(NULL, 142);
 +	}
+ 
+ #define DEBUG_BSDINIT 0
+ 
+@@ -499,17 +507,21 @@
+ #endif
+ 
+ 	throttle_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 143); }
+ 
+ 	printf(copyright);
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 144); }
+ 
+ #if CONFIG_DEV_KMEM
+ 	bsd_init_kprintf("calling dev_kmem_init\n");
+ 	dev_kmem_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 145); }
+ #endif
+ 
+ 	/* Initialize kauth subsystem before instancing the first credential */
+ 	bsd_init_kprintf("calling kauth_init\n");
+ 	kauth_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 132); }
+ 
+ 	/* kernel_task->proc = kernproc; */
+ 	set_bsdtask_info(kernel_task, (void *)kernproc);
+@@ -568,6 +580,7 @@
+ 	 * Initialize the MAC Framework
+ 	 */
+ 	mac_policy_initbsd();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 133); }
+ 
+ #if defined (__i386__) || defined (__x86_64__)
+ 	/*
+@@ -680,30 +693,36 @@
+ 	 */
+ 	bsd_init_kprintf("calling bsd_bufferinit\n");
+ 	bsd_bufferinit();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 134); }
+ 
+ 	/*
+ 	 * Initialize the calendar.
+ 	 */
+ 	bsd_init_kprintf("calling IOKitInitializeTime\n");
+ 	IOKitInitializeTime();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 135); }
+ 
+ 	/* Initialize the file systems. */
+ 	bsd_init_kprintf("calling vfsinit\n");
+ 	vfsinit();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 136); }
+ 
+ #if CONFIG_PROC_UUID_POLICY
+ 	/* Initial proc_uuid_policy subsystem */
+ 	bsd_init_kprintf("calling proc_uuid_policy_init()\n");
+ 	proc_uuid_policy_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 156); }
+ #endif
+ 
+ #if SOCKETS
+ 	/* Initialize per-CPU cache allocator */
+ 	mcache_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 157); }
+ 
+ 	/* Initialize mbuf's. */
+ 	bsd_init_kprintf("calling mbinit\n");
+ 	mbinit();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 148); }
+ 	restricted_in_port_init();
+ #endif /* SOCKETS */
+ 
+@@ -719,21 +738,26 @@
+ 	/* Initialize kqueues */
+ 	bsd_init_kprintf("calling knote_init\n");
+ 	knote_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 149); }
+ 
+ 	/* Initialize event handler */
+ 	bsd_init_kprintf("calling eventhandler_init\n");
+ 	eventhandler_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 150); }
+ 
+ 	/* Initialize for async IO */
+ 	bsd_init_kprintf("calling aio_init\n");
+ 	aio_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 151); }
+ 
+ 	pthread_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 152); }
+ 	/* POSIX Shm and Sem */
+ 	bsd_init_kprintf("calling pshm_cache_init\n");
+ 	pshm_cache_init();
+ 	bsd_init_kprintf("calling psem_cache_init\n");
+ 	psem_cache_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 153); }
+ 
+ 	/*
+ 	 * Initialize protocols.  Block reception of incoming packets
+@@ -744,12 +768,14 @@
+ 	nwk_wq_init();
+ 	bsd_init_kprintf("calling dlil_init\n");
+ 	dlil_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 154); }
+ #endif /* NETWORKING */
+ #if SOCKETS
+ 	bsd_init_kprintf("calling socketinit\n");
+ 	socketinit();
+ 	bsd_init_kprintf("calling domaininit\n");
+ 	domaininit();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 155); }
+ 	iptap_init();
+ #if FLOW_DIVERT
+ 	flow_divert_init();
+@@ -784,9 +810,11 @@
+ 
+ 	bsd_init_kprintf("calling sysctl_mib_init\n");
+ 	sysctl_mib_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 137); }
+ 
+ 	bsd_init_kprintf("calling bsd_autoconf\n");
+ 	bsd_autoconf();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 138); }
+ 
+ #if CONFIG_DTRACE
+ 	dtrace_postinit();
+@@ -862,12 +890,14 @@
+ 
+ 		bsd_init_kprintf("calling setconf\n");
+ 		setconf();
++		{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 139); }
+ #if CONFIG_NETBOOT
+ 		netboot = (mountroot == netboot_mountroot);
+ #endif
+ 
+ 		bsd_init_kprintf("vfs_mountroot\n");
+ 		if (0 == (err = vfs_mountroot())) {
++			{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 140); }
+ 			break;
+ 		}
+ 		rootdevice[0] = '\0';
+diff -r C6/bsd/kern/uipc_mbuf.c B6/bsd/kern/uipc_mbuf.c
+--- C6/bsd/kern/uipc_mbuf.c	2026-10-23 23:17:10.502635017 +0800
++++ B6/bsd/kern/uipc_mbuf.c	2026-10-23 23:17:10.875618507 +0800
+@@ -1552,6 +1552,8 @@
+ 	return n;
+ }
+ 
++extern void sweet_stage_mark(void *args, unsigned int stage);
 +
-+	if (v == 0) {
-+		digits[n++] = 0;
-+	}
-+	while (v != 0 && n < 3) {
-+		digits[n++] = v % 10;
-+		v /= 10;
-+	}
-+
-+	for (unsigned int i = 0; i < n; i++) {
-+		unsigned int d = digits[n - 1 - i];
-+		uint32_t dx = ox + i * 6 * scale;
-+		for (unsigned int row = 0; row < 7; row++) {
-+			uint8_t bits = sweet_digits[d][row];
-+			for (unsigned int col = 0; col < 5; col++) {
-+				if ((bits & (1u << (4 - col))) == 0) {
-+					continue;
-+				}
-+				for (uint32_t sy = 0; sy < scale; sy++) {
-+					volatile uint32_t *line = fb + (uint64_t)(oy + row * scale + sy) * (stride / 4u);
-+					for (uint32_t sx = 0; sx < scale; sx++) {
-+						line[dx + col * scale + sx] = 0xffffffffu;
-+					}
-+				}
-+			}
-+		}
-+	}
-+	__asm__ volatile ("dsb sy" ::: "memory");
-+}
-+
- void
- sweet_stage_mark(boot_args *args, unsigned int stage)
+ __private_extern__ void
+ mbinit(void)
  {
--	static const uint32_t colors[16] = {
-+	if (args == NULL) {
-+		args = sweet_stage_args;
-+	}
-+	static const uint32_t colors[160] = {
- 		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
- 		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
- 		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
--		0xffff0080u, 0xff80ff00u, 0xff4080c0u, 0xffc08040u
-+		0xffff0080u, 0xff80ff00u, 0xff4080c0u, 0xffc08040u,
-+		0xff20c0ffu, 0xffff8040u, 0xffc020ffu, 0xff80c020u,
-+		0xff00ff40u, 0xffff40ffu, 0xff40ffffu, 0xffffff80u,
-+		0xffff0000u, 0xffff8000u, 0xffffff40u, 0xffff00ffu,
-+		0xff00ff80u, 0xff8000ffu, 0xffff0080u, 0xff80ff80u,
-+		0xff8080ffu, 0xffff8080u, 0xff80ffffu, 0xffffff80u,
-+		0xff20ff80u, 0xffff2080u, 0xff80ff20u, 0xff2080ffu,
-+		0xffff8020u, 0xff20ffffu, 0xffff20ffu, 0xff80ffffu,
-+		0xff40ff80u, 0xffff4080u, 0xff80ff40u, 0xff4080ffu,
-+		0xffffc040u, 0xff40c0ffu, 0xffc0ff40u, 0xffff40c0u,
-+		0xff40ffc0u, 0xffc040ffu, 0xffffc0c0u, 0xffc0c0ffu,
-+		0xff80c0ffu, 0xffffc080u, 0xffc0ff80u, 0xffff80c0u,
-+		0xff80ffc0u, 0xffc080ffu, 0xffffc0ffu, 0xffc0ffffu,
-+		0xff60ff60u, 0xffff6060u, 0xff6060ffu, 0xffffff60u,
-+		0xff60ffffu, 0xffff60ffu, 0xffa0a0a0u, 0xffffffffu,
-+		0xff202020u, 0xffff8000u, 0xff0080ffu, 0xff80ff00u,
-+		0xffff0080u, 0xff00ff80u, 0xff8000ffu, 0xff00ffffu,
-+		0xffff4040u, 0xff40ff40u, 0xff4040ffu, 0xffffff40u,
-+		0xff40ffffu, 0xffff40ffu, 0xffc0c0c0u, 0xff808080u,
-+		0xff202060u, 0xffff6020u, 0xff2060ffu, 0xff60ff20u,
-+		0xffff2060u, 0xff20ff60u, 0xff6020ffu, 0xffff2060u,
-+		0xffa02020u, 0xff20a020u, 0xff2020a0u, 0xffa0a020u,
-+		0xff20a0a0u, 0xffa020a0u, 0xffe0e0e0u, 0xff606060u,
-+		0xffc04040u, 0xff40c040u, 0xff4040c0u, 0xffc0c040u,
-+		0xff40c0c0u, 0xffc040c0u, 0xffffe0e0u, 0xff404040u,
-+		0xffffff00u, 0xff00ffffu, 0xffff00ffu, 0xff00ff00u,
-+		0xffff0000u, 0xff0000ffu, 0xff808080u, 0xffc0c0c0u,
-+		0xff800000u, 0xff008000u, 0xff000080u, 0xff808000u,
-+		0xff008080u, 0xff800080u, 0xff404040u, 0xffffffffu,
-+		0xff400000u, 0xff004000u, 0xff000040u, 0xff404000u,
-+		0xff004040u, 0xff400040u, 0xff202020u, 0xffe0e0e0u,
-+		0xffc00000u, 0xff00c000u, 0xff0000c0u, 0xffc0c000u,
-+		0xff00c0c0u, 0xffc000c0u, 0xff808000u, 0xff008080u,
-+		0xffff8080u, 0xff80ff80u, 0xff8080ffu, 0xffffff80u,
-+		0xff80ffffu, 0xffff80ffu, 0xffc0c0c0u, 0xff606060u,
-+		0xffff0000u, 0xff00ff00u, 0xff0000ffu, 0xffffff00u,
-+		0xff00ffffu, 0xffff00ffu, 0xff9f9f9fu, 0xff5f5f5fu
- 	};
+@@ -1559,7 +1561,9 @@
+ 	unsigned int initmcl = 0;
+ 	thread_t thread = THREAD_NULL;
  
--	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 999) {
- 		return;
++	sweet_stage_mark(NULL, 173);
+ 	microuptime(&mb_start);
++	sweet_stage_mark(NULL, 174);
+ 
+ 	/*
+ 	 * These MBUF_ values must be equal to their private counterparts.
+@@ -1639,10 +1643,14 @@
+ 	_CASSERT(sizeof(mb_redzone_cookie) ==
+ 	    sizeof(((struct pkthdr *)0)->redzone));
+ 	read_random(&mb_redzone_cookie, sizeof(mb_redzone_cookie));
++	sweet_stage_mark(NULL, 175);
+ 	read_random(&mb_obscure_extref, sizeof(mb_obscure_extref));
++	sweet_stage_mark(NULL, 176);
+ 	read_random(&mb_obscure_extfree, sizeof(mb_obscure_extfree));
++	sweet_stage_mark(NULL, 177);
+ 	mb_obscure_extref |= 0x3;
+ 	mb_obscure_extfree |= 0x3;
++	sweet_stage_mark(NULL, 160);
+ 
+ 	/* Make sure we don't save more than we should */
+ 	_CASSERT(MCA_SAVED_MBUF_SIZE <= sizeof(struct mbuf));
+@@ -1651,11 +1659,13 @@
+ 		nmbclusters = NMBCLUSTERS;
  	}
- 	uint64_t base = args->Video.v_baseAddr;
-@@ -28,22 +143,37 @@
- 		return;
+ 
++	sweet_stage_mark(NULL, 161);
+ 	/* This should be a sane (at least even) value by now */
+ 	VERIFY(nmbclusters != 0 && !(nmbclusters & 0x1));
+ 
+ 	/* Setup the mbuf table */
+ 	mbuf_table_init();
++	sweet_stage_mark(NULL, 162);
+ 
+ 	/*
+ 	 * Allocate cluster slabs table:
+@@ -1669,6 +1679,7 @@
+ 	    (P2ROUNDUP(nmbclusters, (MBSIZE >> MCLSHIFT)) << MCLSHIFT) >> MBSHIFT;
+ 	slabstbl = zalloc_permanent(maxslabgrp * sizeof(mcl_slabg_t *),
+ 	    ZALIGN(mcl_slabg_t));
++	sweet_stage_mark(NULL, 163);
+ 
+ 	/*
+ 	 * Allocate audit structures, if needed:
+@@ -1702,6 +1713,7 @@
+ 	/* Enable mbuf leak logging, with a lock to protect the tables */
+ 
+ 	mleak_activate();
++	sweet_stage_mark(NULL, 164);
+ 
+ 	/*
+ 	 * Allocate structure for per-CPU statistics that's aligned
+@@ -1710,18 +1722,22 @@
+ 	 * before alignment is not saved.
+ 	 */
+ 	ncpu = ml_wait_max_cpus();
++	sweet_stage_mark(NULL, 165);
+ 
+ 	/* Calculate the number of pages assigned to the cluster pool */
+ 	mcl_pages = (nmbclusters << MCLSHIFT) / PAGE_SIZE;
+ 	mcl_paddr = zalloc_permanent(mcl_pages * sizeof(ppnum_t),
+ 	    ZALIGN(ppnum_t));
++	sweet_stage_mark(NULL, 166);
+ 
+ 	/* Register with the I/O Bus mapper */
+ 	mcl_paddr_base = IOMapperIOVMAlloc(mcl_pages);
++	sweet_stage_mark(NULL, 167);
+ 
+ 	embutl = (mbutl + (nmbclusters * MCLBYTES));
+ 	VERIFY(((embutl - mbutl) % MBIGCLBYTES) == 0);
+ 
++	sweet_stage_mark(NULL, 168);
+ 	/* Prime up the freelist */
+ 	PE_parse_boot_argn("initmcl", &initmcl, sizeof(initmcl));
+ 	if (initmcl != 0) {
+@@ -1734,6 +1750,7 @@
+ 		initmcl = m_minlimit(MC_BIGCL);
  	}
- 	volatile uint32_t *fb = (volatile uint32_t *)(uintptr_t)base;
-+	/* Extended stages only need the number; the 160-entry color table and
-+	 * the block band stop at 159. */
-+	if (stage > 159) {
-+		sweet_stage_number(args, stage);
-+		__asm__ volatile ("dsb sy" ::: "memory");
-+		return;
-+	}
- 	if (stage == 0) {
- 		for (uint32_t row = 0; row < 144; row++) {
- 			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
--			for (uint32_t col = 300; col < 628; col++) {
-+			for (uint32_t col = 300; col < 1100; col++) {
- 				line[col] = 0;
+ 
++	sweet_stage_mark(NULL, 169);
+ 	lck_mtx_lock(mbuf_mlock);
+ 
+ 	/*
+@@ -1742,6 +1759,7 @@
+ 	 */
+ 	VERIFY(m_total(MC_BIGCL) == 0 && m_minlimit(MC_BIGCL) != 0);
+ 	freelist_populate(m_class(MC_BIGCL), initmcl, M_WAIT);
++	sweet_stage_mark(NULL, 170);
+ 	VERIFY(m_total(MC_BIGCL) >= m_minlimit(MC_BIGCL));
+ 	freelist_init(m_class(MC_CL));
+ 
+@@ -1756,11 +1774,13 @@
+ 	mb_peak_newreport = FALSE;
+ 
+ 	lck_mtx_unlock(mbuf_mlock);
++	sweet_stage_mark(NULL, 171);
+ 
+ 	(void) kernel_thread_start((thread_continue_t)mbuf_worker_thread_init,
+ 	    NULL, &thread);
+ 	thread_deallocate(thread);
+ 
++	sweet_stage_mark(NULL, 172);
+ 	ref_cache = mcache_create("mext_ref", sizeof(struct ext_ref),
+ 	    0, 0, MCR_SLEEP);
+ 
+diff -r C6/bsd/net/dlil.c B6/bsd/net/dlil.c
+--- C6/bsd/net/dlil.c	2026-10-23 23:17:10.518634585 +0800
++++ B6/bsd/net/dlil.c	2026-10-23 23:33:06.745664716 +0800
+@@ -143,6 +143,8 @@
+ 
+ #include <os/log.h>
+ 
++extern void sweet_stage_mark(void *args, unsigned int stage);
++
+ #define DBG_LAYER_BEG           DLILDBG_CODE(DBG_DLIL_STATIC, 0)
+ #define DBG_LAYER_END           DLILDBG_CODE(DBG_DLIL_STATIC, 2)
+ #define DBG_FNC_DLIL_INPUT      DLILDBG_CODE(DBG_DLIL_STATIC, (1 << 8))
+@@ -1676,6 +1678,7 @@
+ static void
+ dlil_decr_pending_thread_count(void)
+ {
++	sweet_stage_mark(NULL, 179);
+ 	LCK_MTX_ASSERT(&dlil_thread_sync_lock, LCK_MTX_ASSERT_NOTOWNED);
+ 	lck_mtx_lock(&dlil_thread_sync_lock);
+ 	VERIFY(dlil_pending_thread_cnt > 0);
+@@ -2701,12 +2704,15 @@
+ 	 * Wait for the created kernel threads for dlil to get
+ 	 * scheduled and run at least once before we proceed
+ 	 */
++	sweet_stage_mark(NULL, 180);
+ 	lck_mtx_lock(&dlil_thread_sync_lock);
+ 	while (dlil_pending_thread_cnt != 0) {
++		sweet_stage_mark(NULL, 181);
+ 		DLIL_PRINTF("%s: Waiting for all the create dlil kernel "
+ 		    "threads to get scheduled at least once.\n", __func__);
+ 		(void) msleep(&dlil_pending_thread_cnt, &dlil_thread_sync_lock,
+ 		    (PZERO - 1), __func__, NULL);
++		sweet_stage_mark(NULL, 182);
+ 		LCK_MTX_ASSERT(&dlil_thread_sync_lock, LCK_ASSERT_OWNED);
+ 	}
+ 	lck_mtx_unlock(&dlil_thread_sync_lock);
+@@ -3009,6 +3015,7 @@
+ static void
+ dlil_main_input_thread_func(void *v, wait_result_t w)
+ {
++	sweet_stage_mark(NULL, 178);
+ #pragma unused(w)
+ 	struct dlil_threading_info *inp = v;
+ 
+diff -r C6/iokit/Kernel/IOMapper.cpp B6/iokit/Kernel/IOMapper.cpp
+--- C6/iokit/Kernel/IOMapper.cpp	2026-10-23 23:17:10.573633098 +0800
++++ B6/iokit/Kernel/IOMapper.cpp	2026-10-23 23:17:10.875578152 +0800
+@@ -60,7 +60,13 @@
+ OSMetaClassDefineReservedUnused(IOMapper, 14);
+ OSMetaClassDefineReservedUnused(IOMapper, 15);
+ 
+-IOMapper * IOMapper::gSystem = (IOMapper *) IOMapper::kUnknown;
++/*
++ * Native ports have no system IOMapper and the platform expert starts after
++ * mbinit(); kUnknown makes IOMapperIOVMAlloc() sleep in
++ * waitForSystemMapper() forever. Start as kNoMapper so early clients take the
++ * physical-address passthrough path; a real IOMapper::start() overwrites this.
++ */
++IOMapper * IOMapper::gSystem = (IOMapper *) IOMapper::kNoMapper;
+ 
+ class IOMapperLock {
+ 	IOLock *fWaitLock;
+diff -r C6/iokit/Kernel/IOPlatformExpert.cpp B6/iokit/Kernel/IOPlatformExpert.cpp
+--- C6/iokit/Kernel/IOPlatformExpert.cpp	2026-10-23 23:17:10.575633044 +0800
++++ B6/iokit/Kernel/IOPlatformExpert.cpp	2026-10-23 23:17:10.875514735 +0800
+@@ -62,6 +62,8 @@
+ #include <pexpert/pexpert.h>
+ #include <uuid/uuid.h>
+ #include <sys/sysctl.h>
++
++extern "C" void sweet_stage_mark(boot_args *args, unsigned int stage);
+ }
+ 
+ #define kShutdownTimeout    30 //in secs
+@@ -153,8 +155,10 @@
+ 	}
+ 
+ 	// Register the presence or lack thereof a system
+-	// PCI address mapper with the IOMapper class
+-	IOMapper::setMapperRequired(NULL != getProperty(kIOPlatformMapperPresentKey));
++	// PCI address mapper with the IOMapper class.
++	// Native ports have no DART/IOMMU mapper; declaring one present makes
++	// mbinit's IOMapperIOVMAlloc wait forever in waitForSystemMapper().
++	IOMapper::setMapperRequired(false);
+ 
+ 	gIOInterruptControllers = OSDictionary::withCapacity(1);
+ 	gIOInterruptControllersLock = IOLockAlloc();
+@@ -2130,7 +2134,9 @@
+ void
+ IOPlatformExpertDevice::configureDefaults( void )
+ {
++	sweet_stage_mark(NULL, 110);
+ 	createNVRAM();
++	sweet_stage_mark(NULL, 111);
+ 	// Parse the serial-number data and publish a user-readable string
+ 	OSData* mydata = (OSData*) (getProperty("serial-number"));
+ 	if (mydata != NULL) {
+@@ -2140,7 +2146,14 @@
+ 			serNoString->release();
+ 		}
+ 	}
++	sweet_stage_mark(NULL, 112);
++#if !defined(APPLE_ARM64_ARCH_FAMILY)
++	/* The source corecrypto registration runs at EARLY_BOOT, after this
++	 * point; the platform UUID is generated once crypto is available. */
++#else
+ 	generatePlatformUUID();
++#endif
++	sweet_stage_mark(NULL, 113);
+ }
+ 
+ void
+@@ -2156,6 +2169,7 @@
+ 	if (options == NULL) {
+ 		return; // /options may not be present
+ 	}
++	sweet_stage_mark(NULL, 114);
+ 
+ 	assert(gIOOptionsEntry == NULL);
+ 	gIOOptionsEntry = new IODTNVRAM;
+@@ -2165,6 +2179,7 @@
+ 	gIOOptionsEntry->init(options, gIODTPlane);
+ 	gIOOptionsEntry->attach(this);
+ 	gIOOptionsEntry->start(this);
++	sweet_stage_mark(NULL, 115);
+ 	options->release();
+ }
+ 
+@@ -2176,15 +2191,19 @@
+ 	uuid_string_t     uuid;
+ 
+ #if !defined(__x86_64__)
++	sweet_stage_mark(NULL, 116);
+ 	entry = IORegistryEntry::fromPath( "/chosen", gIODTPlane );
++	sweet_stage_mark(NULL, 117);
+ 	if (entry) {
+ 		OSData * data1;
+ 
+ 		data1 = OSDynamicCast( OSData, entry->getProperty( "unique-chip-id" ));
++		sweet_stage_mark(NULL, 118);
+ 		if (data1 && data1->getLength() == 8) {
+ 			OSData * data2;
+ 
+ 			data2 = OSDynamicCast( OSData, entry->getProperty( "chip-id" ));
++			sweet_stage_mark(NULL, 119);
+ 			if (data2 && data2->getLength() == 4) {
+ 				SHA1_CTX     context;
+ 				uint8_t      digest[SHA_DIGEST_LENGTH];
+@@ -2195,17 +2214,20 @@
+ 				SHA1Update( &context, data1->getBytesNoCopy(), data1->getLength());
+ 				SHA1Update( &context, data2->getBytesNoCopy(), data2->getLength());
+ 				SHA1Final( digest, &context );
++				sweet_stage_mark(NULL, 120);
+ 
+ 				digest[6] = (digest[6] & 0x0F) | 0x50;
+ 				digest[8] = (digest[8] & 0x3F) | 0x80;
+ 
+ 				uuid_unparse( digest, uuid );
+ 				string = OSString::withCString( uuid );
++				sweet_stage_mark(NULL, 121);
  			}
  		}
- 		__asm__ volatile ("dsb sy" ::: "memory");
+ 
+ 		entry->release();
  	}
--	uint32_t y = 40u + (stage & 7u) * 20u;
--	uint32_t x = 300u;
-+	/* Keep every marker below 2 MiB: the bootstrap maps only the first
-+	 * 2 MiB of the framebuffer V=P, so y=380 would fault. */
-+	uint32_t y = stage < 28u ? 40u + (stage & 7u) * 20u :
-+	    (stage < 128u ? 220u + ((stage - 28u) & 7u) * 20u :
-+	    220u + ((stage - 128u) & 7u) * 20u);
-+	uint32_t x = stage < 12u ? 300u : (stage < 16u ? 500u :
-+	    (stage < 20u ? 700u : (stage < 24u ? 900u :
-+	    (stage < 28u ? 1100u : (stage < 128u ?
-+	    300u + ((stage < 80u ? stage - 28u : stage - 80u) / 8u) * 200u : 300u)))));
- 	for (uint32_t row = 0; row < 4; row++) {
- 		volatile uint32_t *line = fb + (uint64_t)(y + row) * (stride / 4u);
- 		for (uint32_t col = x; col < x + 128u; col++) {
- 			line[col] = colors[stage];
- 		}
++	sweet_stage_mark(NULL, 122);
+ #else /* !defined(__x86_64__) */
+ 	OSData * data;
+ 
+diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
+--- C6/osfmk/arm/arm_init.c	2026-10-23 23:33:18.159317562 +0800
++++ B6/osfmk/arm/arm_init.c	2026-10-23 23:17:10.875369607 +0800
+@@ -347,6 +347,8 @@
+ 	DTEntry chosen = NULL;
+ 	unsigned int dt_entry_size = 0;
+ 
++	extern void sweet_stage_set_args(boot_args *args);
++	sweet_stage_set_args(args);
+ 	sweet_stage_mark(args, 0);
+ 	arm_setup_pre_sign();
+ 	sweet_stage_mark(args, 8);
+@@ -537,6 +539,7 @@
+ 
+ 	sweet_stage_mark(args, 7);
+ 	arm_vm_init(xmaxmem, args);
++	sweet_stage_mark(args, 16);
+ 
+ 	if (debug_boot_arg) {
+ 		patch_low_glo();
+@@ -547,10 +550,13 @@
+ #endif
+ 
+ 	PE_consistent_debug_inherit();
++	sweet_stage_mark(args, 28);
+ 
+ 	/* Setup debugging output. */
+ 	const unsigned int serial_exists = serial_init();
++	sweet_stage_mark(args, 29);
+ 	kernel_startup_initialize_upto(STARTUP_SUB_KPRINTF);
++	sweet_stage_mark(args, 30);
+ 	kprintf("kprintf initialized\n");
+ 
+ 	serialmode = 0;
+@@ -584,6 +590,7 @@
+ 	if (kern_feature_override(KF_SERIAL_OVRD)) {
+ 		serialmode = 0;
  	}
-+	sweet_stage_number(args, stage);
- 	__asm__ volatile ("dsb sy" ::: "memory");
++	sweet_stage_mark(args, 31);
+ 
+ 	/* Start serial if requested and a serial device was enumerated in serial_init(). */
+ 	if ((serialmode & SERIALMODE_OUTPUT) && serial_exists) {
+@@ -592,9 +599,11 @@
+ 		disableConsoleOutput = FALSE;     /* Allow printfs to happen */
+ 	}
+ 	PE_create_console();
++	sweet_stage_mark(args, 32);
+ 
+ 	/* setup console output */
+ 	PE_init_printf(FALSE);
++	sweet_stage_mark(args, 33);
+ 
+ #if __arm64__
+ #if DEBUG
+@@ -603,8 +612,10 @@
+ #endif
+ 
+ 	cpu_machine_idle_init(TRUE);
++	sweet_stage_mark(args, 34);
+ 
+ 	PE_init_platform(TRUE, &BootCpuData);
++	sweet_stage_mark(args, 35);
+ 
+ #if __arm64__
+ 	extern bool cpu_config_correct;
+@@ -613,6 +624,7 @@
+ 	}
+ 
+ 	ml_map_cpu_pio();
++	sweet_stage_mark(args, 36);
+ 
+ #if APPLE_ARM64_ARCH_FAMILY
+ 	configure_late_apple_regs();
+@@ -621,6 +633,7 @@
+ #endif
+ 
+ 	cpu_timebase_init(TRUE);
++	sweet_stage_mark(args, 37);
+ 
+ #if KPERF
+ 	/* kptimer_curcpu_up() must be called after cpu_timebase_init */
+@@ -628,7 +641,9 @@
+ #endif /* KPERF */
+ 
+ 	PE_init_cpu();
++	sweet_stage_mark(args, 38);
+ 	fiq_context_init(TRUE);
++	sweet_stage_mark(args, 39);
+ 
+ 
+ #if HIBERNATION
+@@ -654,9 +669,11 @@
+ 	if (SecureDTGetProperty(chosen, "dram-size", (void const **)&dram_size, &dt_entry_size) != kSuccess) {
+ 		panic("%s: Unable to find 'dram-size' entry in the 'chosen' DT node", __FUNCTION__);
+ 	}
++	sweet_stage_mark(args, 40);
+ 
+ 	gDramBase = *dram_base;
+ 	gDramSize = *dram_size;
++	sweet_stage_mark(args, 41);
+ 
+ 	/*
+ 	 * Initialize the stack protector for all future calls
+@@ -670,6 +687,7 @@
+ 	 * against string vulnerabilities
+ 	 */
+ 	__stack_chk_guard &= ~(0xFFULL << 8);
++	sweet_stage_mark(args, 42);
+ 	machine_startup(args);
  }
-diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
---- a/osfmk/arm64/arm_vm_init.c
-+++ b/osfmk/arm64/arm_vm_init.c
+ 
+diff -r C6/osfmk/arm/machine_routines_common.c B6/osfmk/arm/machine_routines_common.c
+--- C6/osfmk/arm/machine_routines_common.c	2026-10-23 23:17:10.598632422 +0800
++++ B6/osfmk/arm/machine_routines_common.c	2026-10-23 23:17:10.875407878 +0800
+@@ -1420,6 +1420,13 @@
+ 	machine_info.max_cpus = num_cpus;
+ 	machine_info.physical_cpu_max = num_cpus;
+ 	machine_info.logical_cpu_max = num_cpus;
++
++	/*
++	 * Native ports have no platform expert to publish the final CPU count;
++	 * ml_wait_max_cpus() (mcache_init) sleeps until this flag is set. The
++	 * topology is final here and the lock subsystem is up.
++	 */
++	ml_set_max_cpus(num_cpus);
+ }
+ 
+ void
+diff -r C6/osfmk/arm64/arm_vm_init.c B6/osfmk/arm64/arm_vm_init.c
+--- C6/osfmk/arm64/arm_vm_init.c	2026-10-23 23:33:18.165670859 +0800
++++ B6/osfmk/arm64/arm_vm_init.c	2026-10-23 23:17:10.875369607 +0800
 @@ -1809,9 +1809,86 @@
  	}
  }
@@ -401,120 +785,9 @@ diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
  #if defined(KERNEL_INTEGRITY_KTRR) || defined(KERNEL_INTEGRITY_CTRR)
  	/*
  	 * In this configuration, the bootstrap mappings (arm_vm_init) and
-diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
---- a/osfmk/arm/arm_init.c
-+++ b/osfmk/arm/arm_init.c
-@@ -347,6 +347,8 @@
- 	DTEntry chosen = NULL;
- 	unsigned int dt_entry_size = 0;
- 
-+	extern void sweet_stage_set_args(boot_args *args);
-+	sweet_stage_set_args(args);
- 	sweet_stage_mark(args, 0);
- 	arm_setup_pre_sign();
- 	sweet_stage_mark(args, 8);
-@@ -537,6 +539,7 @@
- 
- 	sweet_stage_mark(args, 7);
- 	arm_vm_init(xmaxmem, args);
-+	sweet_stage_mark(args, 16);
- 
- 	if (debug_boot_arg) {
- 		patch_low_glo();
-@@ -547,10 +550,13 @@
- #endif
- 
- 	PE_consistent_debug_inherit();
-+	sweet_stage_mark(args, 28);
- 
- 	/* Setup debugging output. */
- 	const unsigned int serial_exists = serial_init();
-+	sweet_stage_mark(args, 29);
- 	kernel_startup_initialize_upto(STARTUP_SUB_KPRINTF);
-+	sweet_stage_mark(args, 30);
- 	kprintf("kprintf initialized\n");
- 
- 	serialmode = 0;
-@@ -584,6 +590,7 @@
- 	if (kern_feature_override(KF_SERIAL_OVRD)) {
- 		serialmode = 0;
- 	}
-+	sweet_stage_mark(args, 31);
- 
- 	/* Start serial if requested and a serial device was enumerated in serial_init(). */
- 	if ((serialmode & SERIALMODE_OUTPUT) && serial_exists) {
-@@ -592,9 +599,11 @@
- 		disableConsoleOutput = FALSE;     /* Allow printfs to happen */
- 	}
- 	PE_create_console();
-+	sweet_stage_mark(args, 32);
- 
- 	/* setup console output */
- 	PE_init_printf(FALSE);
-+	sweet_stage_mark(args, 33);
- 
- #if __arm64__
- #if DEBUG
-@@ -603,8 +612,10 @@
- #endif
- 
- 	cpu_machine_idle_init(TRUE);
-+	sweet_stage_mark(args, 34);
- 
- 	PE_init_platform(TRUE, &BootCpuData);
-+	sweet_stage_mark(args, 35);
- 
- #if __arm64__
- 	extern bool cpu_config_correct;
-@@ -613,6 +624,7 @@
- 	}
- 
- 	ml_map_cpu_pio();
-+	sweet_stage_mark(args, 36);
- 
- #if APPLE_ARM64_ARCH_FAMILY
- 	configure_late_apple_regs();
-@@ -621,6 +633,7 @@
- #endif
- 
- 	cpu_timebase_init(TRUE);
-+	sweet_stage_mark(args, 37);
- 
- #if KPERF
- 	/* kptimer_curcpu_up() must be called after cpu_timebase_init */
-@@ -628,7 +641,9 @@
- #endif /* KPERF */
- 
- 	PE_init_cpu();
-+	sweet_stage_mark(args, 38);
- 	fiq_context_init(TRUE);
-+	sweet_stage_mark(args, 39);
- 
- 
- #if HIBERNATION
-@@ -654,9 +669,11 @@
- 	if (SecureDTGetProperty(chosen, "dram-size", (void const **)&dram_size, &dt_entry_size) != kSuccess) {
- 		panic("%s: Unable to find 'dram-size' entry in the 'chosen' DT node", __FUNCTION__);
- 	}
-+	sweet_stage_mark(args, 40);
- 
- 	gDramBase = *dram_base;
- 	gDramSize = *dram_size;
-+	sweet_stage_mark(args, 41);
- 
- 	/*
- 	 * Initialize the stack protector for all future calls
-@@ -670,6 +687,7 @@
- 	 * against string vulnerabilities
- 	 */
- 	__stack_chk_guard &= ~(0xFFULL << 8);
-+	sweet_stage_mark(args, 42);
- 	machine_startup(args);
- }
- 
-diff --git a/osfmk/arm64/machine_routines.c b/osfmk/arm64/machine_routines.c
---- a/osfmk/arm64/machine_routines.c
-+++ b/osfmk/arm64/machine_routines.c
+diff -r C6/osfmk/arm64/machine_routines.c B6/osfmk/arm64/machine_routines.c
+--- C6/osfmk/arm64/machine_routines.c	2026-10-23 23:17:10.602632314 +0800
++++ B6/osfmk/arm64/machine_routines.c	2026-10-23 23:17:10.875407878 +0800
 @@ -476,6 +476,9 @@
  void
  machine_startup(__unused boot_args * args)
@@ -533,26 +806,233 @@ diff --git a/osfmk/arm64/machine_routines.c b/osfmk/arm64/machine_routines.c
  
  
  	/*
-diff --git a/osfmk/arm/machine_routines_common.c b/osfmk/arm/machine_routines_common.c
---- a/osfmk/arm/machine_routines_common.c
-+++ b/osfmk/arm/machine_routines_common.c
-@@ -1420,6 +1420,13 @@
- 	machine_info.max_cpus = num_cpus;
- 	machine_info.physical_cpu_max = num_cpus;
- 	machine_info.logical_cpu_max = num_cpus;
-+
-+	/*
-+	 * Native ports have no platform expert to publish the final CPU count;
-+	 * ml_wait_max_cpus() (mcache_init) sleeps until this flag is set. The
-+	 * topology is final here and the lock subsystem is up.
-+	 */
-+	ml_set_max_cpus(num_cpus);
+diff -r C6/osfmk/arm64/pcb.c B6/osfmk/arm64/pcb.c
+--- C6/osfmk/arm64/pcb.c	2026-10-23 23:17:10.603632287 +0800
++++ B6/osfmk/arm64/pcb.c	2026-10-23 23:33:06.745093886 +0800
+@@ -555,6 +555,10 @@
+ 
+ 	call_continuation_kprintf("thread = %p continuation = %p, stack = %lx\n",
+ 	    current_thread(), continuation, current_thread()->machine.kstackptr);
++	{
++		extern void sweet_stage_mark(void *args, unsigned int stage);
++		sweet_stage_mark(NULL, 183);
++	}
+ 	Call_continuation(continuation, parameter, wresult, enable_interrupts);
  }
  
+diff -r C6/osfmk/arm64/sweet_stage.c B6/osfmk/arm64/sweet_stage.c
+--- C6/osfmk/arm64/sweet_stage.c	2026-10-23 23:33:18.143296208 +0800
++++ B6/osfmk/arm64/sweet_stage.c	2026-10-23 23:17:10.875354799 +0800
+@@ -1,25 +1,140 @@
+ /*
+  * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
+  * of the boot framebuffer V=P, so these writes work from C with the MMU on
+- * and without any IOKit driver. Each stage is a 128x4 block at x=300,
+- * y=40+stage*20; stage 0 is the C entry and stage 7 is immediately before
++ * and without any IOKit driver. Stages are 128x4 blocks at
++ * y=40+(stage&7)*20, one column per group: 0-11 x=300, 12-15 x=500,
++ * 16-19 x=700, 20-23 x=900, 24-27 x=1100. Stages 28+ use a second band at
++ * y=220+(stage&7)*20, x=300 for 28-35. Stage 7 is immediately before
+  * arm_vm_init tears down the bootstrap TTBR0.
+  */
+ #include <pexpert/pexpert.h>
+ #include <pexpert/arm64/boot.h>
+ #include <stdint.h>
+ 
++static boot_args *sweet_stage_args;
++
++void
++sweet_stage_set_args(boot_args *args)
++{
++	sweet_stage_args = args;
++}
++
++
++/* 5x7 digits, drawn at 10x so the last stage is readable in a photo. */
++static const uint8_t sweet_digits[10][7] = {
++	{ 0x0e, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0e },
++	{ 0x04, 0x0c, 0x04, 0x04, 0x04, 0x04, 0x0e },
++	{ 0x0e, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1f },
++	{ 0x1f, 0x02, 0x04, 0x02, 0x01, 0x11, 0x0e },
++	{ 0x02, 0x06, 0x0a, 0x12, 0x1f, 0x02, 0x02 },
++	{ 0x1f, 0x10, 0x1e, 0x01, 0x01, 0x11, 0x0e },
++	{ 0x06, 0x08, 0x10, 0x1e, 0x11, 0x11, 0x0e },
++	{ 0x1f, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08 },
++	{ 0x0e, 0x11, 0x11, 0x0e, 0x11, 0x11, 0x0e },
++	{ 0x0e, 0x11, 0x11, 0x0f, 0x01, 0x02, 0x0c },
++};
++
++static void
++sweet_stage_number(boot_args *args, unsigned int stage)
++{
++	uint64_t base = args->Video.v_baseAddr;
++	uint32_t stride = (uint32_t)args->Video.v_rowBytes;
++	const uint32_t scale = 10;
++	const uint32_t ox = 16, oy = 16;
++	uint32_t digits[3];
++	unsigned int n = 0, v = stage;
++
++	if (base == 0 || stride < 4) {
++		return;
++	}
++	volatile uint32_t *fb = (volatile uint32_t *)(uintptr_t)base;
++
++	for (uint32_t y = 0; y < 8 * scale; y++) {
++		volatile uint32_t *line = fb + (uint64_t)(oy + y) * (stride / 4u);
++		for (uint32_t x = 0; x < 3 * 6 * scale; x++) {
++			line[ox + x] = 0;
++		}
++	}
++
++	if (v == 0) {
++		digits[n++] = 0;
++	}
++	while (v != 0 && n < 3) {
++		digits[n++] = v % 10;
++		v /= 10;
++	}
++
++	for (unsigned int i = 0; i < n; i++) {
++		unsigned int d = digits[n - 1 - i];
++		uint32_t dx = ox + i * 6 * scale;
++		for (unsigned int row = 0; row < 7; row++) {
++			uint8_t bits = sweet_digits[d][row];
++			for (unsigned int col = 0; col < 5; col++) {
++				if ((bits & (1u << (4 - col))) == 0) {
++					continue;
++				}
++				for (uint32_t sy = 0; sy < scale; sy++) {
++					volatile uint32_t *line = fb + (uint64_t)(oy + row * scale + sy) * (stride / 4u);
++					for (uint32_t sx = 0; sx < scale; sx++) {
++						line[dx + col * scale + sx] = 0xffffffffu;
++					}
++				}
++			}
++		}
++	}
++	__asm__ volatile ("dsb sy" ::: "memory");
++}
++
  void
-diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
---- a/osfmk/kern/startup.c
-+++ b/osfmk/kern/startup.c
+ sweet_stage_mark(boot_args *args, unsigned int stage)
+ {
+-	static const uint32_t colors[16] = {
++	if (args == NULL) {
++		args = sweet_stage_args;
++	}
++	static const uint32_t colors[160] = {
+ 		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
+ 		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
+ 		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
+-		0xffff0080u, 0xff80ff00u, 0xff4080c0u, 0xffc08040u
++		0xffff0080u, 0xff80ff00u, 0xff4080c0u, 0xffc08040u,
++		0xff20c0ffu, 0xffff8040u, 0xffc020ffu, 0xff80c020u,
++		0xff00ff40u, 0xffff40ffu, 0xff40ffffu, 0xffffff80u,
++		0xffff0000u, 0xffff8000u, 0xffffff40u, 0xffff00ffu,
++		0xff00ff80u, 0xff8000ffu, 0xffff0080u, 0xff80ff80u,
++		0xff8080ffu, 0xffff8080u, 0xff80ffffu, 0xffffff80u,
++		0xff20ff80u, 0xffff2080u, 0xff80ff20u, 0xff2080ffu,
++		0xffff8020u, 0xff20ffffu, 0xffff20ffu, 0xff80ffffu,
++		0xff40ff80u, 0xffff4080u, 0xff80ff40u, 0xff4080ffu,
++		0xffffc040u, 0xff40c0ffu, 0xffc0ff40u, 0xffff40c0u,
++		0xff40ffc0u, 0xffc040ffu, 0xffffc0c0u, 0xffc0c0ffu,
++		0xff80c0ffu, 0xffffc080u, 0xffc0ff80u, 0xffff80c0u,
++		0xff80ffc0u, 0xffc080ffu, 0xffffc0ffu, 0xffc0ffffu,
++		0xff60ff60u, 0xffff6060u, 0xff6060ffu, 0xffffff60u,
++		0xff60ffffu, 0xffff60ffu, 0xffa0a0a0u, 0xffffffffu,
++		0xff202020u, 0xffff8000u, 0xff0080ffu, 0xff80ff00u,
++		0xffff0080u, 0xff00ff80u, 0xff8000ffu, 0xff00ffffu,
++		0xffff4040u, 0xff40ff40u, 0xff4040ffu, 0xffffff40u,
++		0xff40ffffu, 0xffff40ffu, 0xffc0c0c0u, 0xff808080u,
++		0xff202060u, 0xffff6020u, 0xff2060ffu, 0xff60ff20u,
++		0xffff2060u, 0xff20ff60u, 0xff6020ffu, 0xffff2060u,
++		0xffa02020u, 0xff20a020u, 0xff2020a0u, 0xffa0a020u,
++		0xff20a0a0u, 0xffa020a0u, 0xffe0e0e0u, 0xff606060u,
++		0xffc04040u, 0xff40c040u, 0xff4040c0u, 0xffc0c040u,
++		0xff40c0c0u, 0xffc040c0u, 0xffffe0e0u, 0xff404040u,
++		0xffffff00u, 0xff00ffffu, 0xffff00ffu, 0xff00ff00u,
++		0xffff0000u, 0xff0000ffu, 0xff808080u, 0xffc0c0c0u,
++		0xff800000u, 0xff008000u, 0xff000080u, 0xff808000u,
++		0xff008080u, 0xff800080u, 0xff404040u, 0xffffffffu,
++		0xff400000u, 0xff004000u, 0xff000040u, 0xff404000u,
++		0xff004040u, 0xff400040u, 0xff202020u, 0xffe0e0e0u,
++		0xffc00000u, 0xff00c000u, 0xff0000c0u, 0xffc0c000u,
++		0xff00c0c0u, 0xffc000c0u, 0xff808000u, 0xff008080u,
++		0xffff8080u, 0xff80ff80u, 0xff8080ffu, 0xffffff80u,
++		0xff80ffffu, 0xffff80ffu, 0xffc0c0c0u, 0xff606060u,
++		0xffff0000u, 0xff00ff00u, 0xff0000ffu, 0xffffff00u,
++		0xff00ffffu, 0xffff00ffu, 0xff9f9f9fu, 0xff5f5f5fu
+ 	};
+ 
+-	if (args == NULL || stage > 15) {
++	if (args == NULL || stage > 999) {
+ 		return;
+ 	}
+ 	uint64_t base = args->Video.v_baseAddr;
+@@ -28,22 +143,37 @@
+ 		return;
+ 	}
+ 	volatile uint32_t *fb = (volatile uint32_t *)(uintptr_t)base;
++	/* Extended stages only need the number; the 160-entry color table and
++	 * the block band stop at 159. */
++	if (stage > 159) {
++		sweet_stage_number(args, stage);
++		__asm__ volatile ("dsb sy" ::: "memory");
++		return;
++	}
+ 	if (stage == 0) {
+ 		for (uint32_t row = 0; row < 144; row++) {
+ 			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
+-			for (uint32_t col = 300; col < 628; col++) {
++			for (uint32_t col = 300; col < 1100; col++) {
+ 				line[col] = 0;
+ 			}
+ 		}
+ 		__asm__ volatile ("dsb sy" ::: "memory");
+ 	}
+-	uint32_t y = 40u + (stage & 7u) * 20u;
+-	uint32_t x = 300u;
++	/* Keep every marker below 2 MiB: the bootstrap maps only the first
++	 * 2 MiB of the framebuffer V=P, so y=380 would fault. */
++	uint32_t y = stage < 28u ? 40u + (stage & 7u) * 20u :
++	    (stage < 128u ? 220u + ((stage - 28u) & 7u) * 20u :
++	    220u + ((stage - 128u) & 7u) * 20u);
++	uint32_t x = stage < 12u ? 300u : (stage < 16u ? 500u :
++	    (stage < 20u ? 700u : (stage < 24u ? 900u :
++	    (stage < 28u ? 1100u : (stage < 128u ?
++	    300u + ((stage < 80u ? stage - 28u : stage - 80u) / 8u) * 200u : 300u)))));
+ 	for (uint32_t row = 0; row < 4; row++) {
+ 		volatile uint32_t *line = fb + (uint64_t)(y + row) * (stride / 4u);
+ 		for (uint32_t col = x; col < x + 128u; col++) {
+ 			line[col] = colors[stage];
+ 		}
+ 	}
++	sweet_stage_number(args, stage);
+ 	__asm__ volatile ("dsb sy" ::: "memory");
+ }
+diff -r C6/osfmk/ipc/ipc_importance.c B6/osfmk/ipc/ipc_importance.c
+--- C6/osfmk/ipc/ipc_importance.c	2026-10-23 23:17:10.613632017 +0800
++++ B6/osfmk/ipc/ipc_importance.c	2026-10-23 23:17:10.875465013 +0800
+@@ -3807,6 +3807,8 @@
+ static void
+ ipc_importance_thread_call_init(void)
+ {
++	extern void sweet_stage_mark(boot_args *args, unsigned int stage);
++	sweet_stage_mark(NULL, 89);
+ 	/* initialize delayed drop queue and thread-call */
+ 	queue_init(&ipc_importance_delayed_drop_queue);
+ 	ipc_importance_delayed_drop_call =
+@@ -3814,6 +3816,7 @@
+ 	if (NULL == ipc_importance_delayed_drop_call) {
+ 		panic("ipc_importance_init");
+ 	}
++	sweet_stage_mark(NULL, 90);
+ }
+ STARTUP(THREAD_CALL, STARTUP_RANK_MIDDLE, ipc_importance_thread_call_init);
+ 
+diff -r C6/osfmk/kern/startup.c B6/osfmk/kern/startup.c
+--- C6/osfmk/kern/startup.c	2026-10-23 23:33:18.164165376 +0800
++++ B6/osfmk/kern/startup.c	2026-10-23 23:17:10.875407878 +0800
 @@ -422,16 +422,22 @@
  void
  kernel_bootstrap(void)
@@ -879,9 +1359,9 @@ diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
  #endif
  
  
-diff --git a/osfmk/kern/thread_call.c b/osfmk/kern/thread_call.c
---- a/osfmk/kern/thread_call.c
-+++ b/osfmk/kern/thread_call.c
+diff -r C6/osfmk/kern/thread_call.c B6/osfmk/kern/thread_call.c
+--- C6/osfmk/kern/thread_call.c	2026-10-23 23:17:10.627631638 +0800
++++ B6/osfmk/kern/thread_call.c	2026-10-23 23:17:10.875465013 +0800
 @@ -528,6 +528,8 @@
  static void
  thread_call_initialize(void)
@@ -899,29 +1379,9 @@ diff --git a/osfmk/kern/thread_call.c b/osfmk/kern/thread_call.c
  }
  STARTUP(THREAD_CALL, STARTUP_RANK_FIRST, thread_call_initialize);
  
-diff --git a/osfmk/ipc/ipc_importance.c b/osfmk/ipc/ipc_importance.c
---- a/osfmk/ipc/ipc_importance.c
-+++ b/osfmk/ipc/ipc_importance.c
-@@ -3807,6 +3807,8 @@
- static void
- ipc_importance_thread_call_init(void)
- {
-+	extern void sweet_stage_mark(boot_args *args, unsigned int stage);
-+	sweet_stage_mark(NULL, 89);
- 	/* initialize delayed drop queue and thread-call */
- 	queue_init(&ipc_importance_delayed_drop_queue);
- 	ipc_importance_delayed_drop_call =
-@@ -3814,6 +3816,7 @@
- 	if (NULL == ipc_importance_delayed_drop_call) {
- 		panic("ipc_importance_init");
- 	}
-+	sweet_stage_mark(NULL, 90);
- }
- STARTUP(THREAD_CALL, STARTUP_RANK_MIDDLE, ipc_importance_thread_call_init);
- 
-diff --git a/osfmk/kern/work_interval.c b/osfmk/kern/work_interval.c
---- a/osfmk/kern/work_interval.c
-+++ b/osfmk/kern/work_interval.c
+diff -r C6/osfmk/kern/work_interval.c B6/osfmk/kern/work_interval.c
+--- C6/osfmk/kern/work_interval.c	2026-10-23 23:17:10.628631611 +0800
++++ B6/osfmk/kern/work_interval.c	2026-10-23 23:17:10.875514735 +0800
 @@ -488,6 +488,8 @@
  static void
  work_interval_subsystem_init(void)
@@ -939,9 +1399,33 @@ diff --git a/osfmk/kern/work_interval.c b/osfmk/kern/work_interval.c
  }
  STARTUP(THREAD_CALL, STARTUP_RANK_MIDDLE, work_interval_subsystem_init);
  #endif /* CONFIG_SCHED_AUTO_JOIN */
-diff --git a/osfmk/vm/analytics.c b/osfmk/vm/analytics.c
---- a/osfmk/vm/analytics.c
-+++ b/osfmk/vm/analytics.c
+diff -r C6/osfmk/prng/prng_random.c B6/osfmk/prng/prng_random.c
+--- C6/osfmk/prng/prng_random.c	2026-10-23 23:33:18.170920180 +0800
++++ B6/osfmk/prng/prng_random.c	2026-10-23 23:17:10.875578152 +0800
+@@ -441,11 +441,18 @@
+ 	};
+ 	uint32_t mode = 0;
+ 
+-	if (PE_parse_boot_argn("fips_mode", &mode, sizeof(mode)) && mode != 0) {
++	/* fips_mode=4 (FIPS_MODE_FLAG_DISABLE) skips the POST; allow it. */
++	if (PE_parse_boot_argn("fips_mode", &mode, sizeof(mode)) && mode != 0 &&
++	    (mode & 0x4) == 0) {
+ 		panic("source corecrypto verification requires complete default POST");
+ 	}
+ 	info.address = (vm_address_t)&_mh_execute_header;
+-	source_corecrypto14_status = corecrypto_kext_start(&info, NULL);
++	{
++		extern void sweet_stage_mark(boot_args *args, unsigned int stage);
++		sweet_stage_mark(NULL, 123);
++		source_corecrypto14_status = corecrypto_kext_start(&info, NULL);
++		sweet_stage_mark(NULL, 124);
++	}
+ 	if (source_corecrypto14_status != KERN_SUCCESS) {
+ 		panic("source corecrypto initialization failed: %d", source_corecrypto14_status);
+ 	}
+diff -r C6/osfmk/vm/analytics.c B6/osfmk/vm/analytics.c
+--- C6/osfmk/vm/analytics.c	2026-10-23 23:17:10.642631233 +0800
++++ B6/osfmk/vm/analytics.c	2026-10-23 23:17:10.875514735 +0800
 @@ -230,6 +230,8 @@
  static void
  vm_analytics_init()
@@ -951,9 +1435,9 @@ diff --git a/osfmk/vm/analytics.c b/osfmk/vm/analytics.c
  	vm_analytics_thread_call = thread_call_allocate_with_options(vm_analytics_tick, NULL, THREAD_CALL_PRIORITY_KERNEL, THREAD_CALL_OPTIONS_ONCE);
  	schedule_analytics_thread_call();
  }
-diff --git a/pexpert/arm/pe_init.c b/pexpert/arm/pe_init.c
---- a/pexpert/arm/pe_init.c
-+++ b/pexpert/arm/pe_init.c
+diff -r C6/pexpert/arm/pe_init.c B6/pexpert/arm/pe_init.c
+--- C6/pexpert/arm/pe_init.c	2026-10-23 23:33:18.161793532 +0800
++++ B6/pexpert/arm/pe_init.c	2026-10-23 23:17:10.875514735 +0800
 @@ -255,7 +255,10 @@
  	uint32_t        load_kernel_start_value = 0;
  	uint32_t        populate_registry_time_value = 0;
@@ -985,468 +1469,3 @@ diff --git a/pexpert/arm/pe_init.c b/pexpert/arm/pe_init.c
  }
  
  void
-diff --git a/iokit/Kernel/IOPlatformExpert.cpp b/iokit/Kernel/IOPlatformExpert.cpp
---- a/iokit/Kernel/IOPlatformExpert.cpp
-+++ b/iokit/Kernel/IOPlatformExpert.cpp
-@@ -62,6 +62,8 @@
- #include <pexpert/pexpert.h>
- #include <uuid/uuid.h>
- #include <sys/sysctl.h>
-+
-+extern "C" void sweet_stage_mark(boot_args *args, unsigned int stage);
- }
- 
- #define kShutdownTimeout    30 //in secs
-@@ -153,8 +155,10 @@
- 	}
- 
- 	// Register the presence or lack thereof a system
--	// PCI address mapper with the IOMapper class
--	IOMapper::setMapperRequired(NULL != getProperty(kIOPlatformMapperPresentKey));
-+	// PCI address mapper with the IOMapper class.
-+	// Native ports have no DART/IOMMU mapper; declaring one present makes
-+	// mbinit's IOMapperIOVMAlloc wait forever in waitForSystemMapper().
-+	IOMapper::setMapperRequired(false);
- 
- 	gIOInterruptControllers = OSDictionary::withCapacity(1);
- 	gIOInterruptControllersLock = IOLockAlloc();
-@@ -2130,7 +2134,9 @@
- void
- IOPlatformExpertDevice::configureDefaults( void )
- {
-+	sweet_stage_mark(NULL, 110);
- 	createNVRAM();
-+	sweet_stage_mark(NULL, 111);
- 	// Parse the serial-number data and publish a user-readable string
- 	OSData* mydata = (OSData*) (getProperty("serial-number"));
- 	if (mydata != NULL) {
-@@ -2140,7 +2146,14 @@
- 			serNoString->release();
- 		}
- 	}
-+	sweet_stage_mark(NULL, 112);
-+#if !defined(APPLE_ARM64_ARCH_FAMILY)
-+	/* The source corecrypto registration runs at EARLY_BOOT, after this
-+	 * point; the platform UUID is generated once crypto is available. */
-+#else
- 	generatePlatformUUID();
-+#endif
-+	sweet_stage_mark(NULL, 113);
- }
- 
- void
-@@ -2156,6 +2169,7 @@
- 	if (options == NULL) {
- 		return; // /options may not be present
- 	}
-+	sweet_stage_mark(NULL, 114);
- 
- 	assert(gIOOptionsEntry == NULL);
- 	gIOOptionsEntry = new IODTNVRAM;
-@@ -2165,6 +2179,7 @@
- 	gIOOptionsEntry->init(options, gIODTPlane);
- 	gIOOptionsEntry->attach(this);
- 	gIOOptionsEntry->start(this);
-+	sweet_stage_mark(NULL, 115);
- 	options->release();
- }
- 
-@@ -2176,15 +2191,19 @@
- 	uuid_string_t     uuid;
- 
- #if !defined(__x86_64__)
-+	sweet_stage_mark(NULL, 116);
- 	entry = IORegistryEntry::fromPath( "/chosen", gIODTPlane );
-+	sweet_stage_mark(NULL, 117);
- 	if (entry) {
- 		OSData * data1;
- 
- 		data1 = OSDynamicCast( OSData, entry->getProperty( "unique-chip-id" ));
-+		sweet_stage_mark(NULL, 118);
- 		if (data1 && data1->getLength() == 8) {
- 			OSData * data2;
- 
- 			data2 = OSDynamicCast( OSData, entry->getProperty( "chip-id" ));
-+			sweet_stage_mark(NULL, 119);
- 			if (data2 && data2->getLength() == 4) {
- 				SHA1_CTX     context;
- 				uint8_t      digest[SHA_DIGEST_LENGTH];
-@@ -2195,17 +2214,20 @@
- 				SHA1Update( &context, data1->getBytesNoCopy(), data1->getLength());
- 				SHA1Update( &context, data2->getBytesNoCopy(), data2->getLength());
- 				SHA1Final( digest, &context );
-+				sweet_stage_mark(NULL, 120);
- 
- 				digest[6] = (digest[6] & 0x0F) | 0x50;
- 				digest[8] = (digest[8] & 0x3F) | 0x80;
- 
- 				uuid_unparse( digest, uuid );
- 				string = OSString::withCString( uuid );
-+				sweet_stage_mark(NULL, 121);
- 			}
- 		}
- 
- 		entry->release();
- 	}
-+	sweet_stage_mark(NULL, 122);
- #else /* !defined(__x86_64__) */
- 	OSData * data;
- 
-diff --git a/iokit/Kernel/IOMapper.cpp b/iokit/Kernel/IOMapper.cpp
---- a/iokit/Kernel/IOMapper.cpp
-+++ b/iokit/Kernel/IOMapper.cpp
-@@ -60,7 +60,13 @@
- OSMetaClassDefineReservedUnused(IOMapper, 14);
- OSMetaClassDefineReservedUnused(IOMapper, 15);
- 
--IOMapper * IOMapper::gSystem = (IOMapper *) IOMapper::kUnknown;
-+/*
-+ * Native ports have no system IOMapper and the platform expert starts after
-+ * mbinit(); kUnknown makes IOMapperIOVMAlloc() sleep in
-+ * waitForSystemMapper() forever. Start as kNoMapper so early clients take the
-+ * physical-address passthrough path; a real IOMapper::start() overwrites this.
-+ */
-+IOMapper * IOMapper::gSystem = (IOMapper *) IOMapper::kNoMapper;
- 
- class IOMapperLock {
- 	IOLock *fWaitLock;
-diff --git a/osfmk/prng/prng_random.c b/osfmk/prng/prng_random.c
---- a/osfmk/prng/prng_random.c
-+++ b/osfmk/prng/prng_random.c
-@@ -441,11 +441,18 @@
- 	};
- 	uint32_t mode = 0;
- 
--	if (PE_parse_boot_argn("fips_mode", &mode, sizeof(mode)) && mode != 0) {
-+	/* fips_mode=4 (FIPS_MODE_FLAG_DISABLE) skips the POST; allow it. */
-+	if (PE_parse_boot_argn("fips_mode", &mode, sizeof(mode)) && mode != 0 &&
-+	    (mode & 0x4) == 0) {
- 		panic("source corecrypto verification requires complete default POST");
- 	}
- 	info.address = (vm_address_t)&_mh_execute_header;
--	source_corecrypto14_status = corecrypto_kext_start(&info, NULL);
-+	{
-+		extern void sweet_stage_mark(boot_args *args, unsigned int stage);
-+		sweet_stage_mark(NULL, 123);
-+		source_corecrypto14_status = corecrypto_kext_start(&info, NULL);
-+		sweet_stage_mark(NULL, 124);
-+	}
- 	if (source_corecrypto14_status != KERN_SUCCESS) {
- 		panic("source corecrypto initialization failed: %d", source_corecrypto14_status);
- 	}
-diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
---- a/bsd/kern/bsd_init.c
-+++ b/bsd/kern/bsd_init.c
-@@ -486,9 +486,17 @@
- 	boolean_t       netboot = FALSE;
- #endif
- 
-+	{
-+		extern void sweet_stage_mark(boot_args *args, unsigned int stage);
-+		sweet_stage_mark(NULL, 141);
-+	}
- #if (DEVELOPMENT || DEBUG)
- 	platform_stall_panic_or_spin(PLATFORM_STALL_XNU_LOCATION_BSD_INIT);
- #endif
-+	{
-+		extern void sweet_stage_mark(boot_args *args, unsigned int stage);
-+		sweet_stage_mark(NULL, 142);
-+	}
- 
- #define DEBUG_BSDINIT 0
- 
-@@ -499,17 +507,21 @@
- #endif
- 
- 	throttle_init();
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 143); }
- 
- 	printf(copyright);
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 144); }
- 
- #if CONFIG_DEV_KMEM
- 	bsd_init_kprintf("calling dev_kmem_init\n");
- 	dev_kmem_init();
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 145); }
- #endif
- 
- 	/* Initialize kauth subsystem before instancing the first credential */
- 	bsd_init_kprintf("calling kauth_init\n");
- 	kauth_init();
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 132); }
- 
- 	/* kernel_task->proc = kernproc; */
- 	set_bsdtask_info(kernel_task, (void *)kernproc);
-@@ -568,6 +580,7 @@
- 	 * Initialize the MAC Framework
- 	 */
- 	mac_policy_initbsd();
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 133); }
- 
- #if defined (__i386__) || defined (__x86_64__)
- 	/*
-@@ -680,30 +693,36 @@
- 	 */
- 	bsd_init_kprintf("calling bsd_bufferinit\n");
- 	bsd_bufferinit();
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 134); }
- 
- 	/*
- 	 * Initialize the calendar.
- 	 */
- 	bsd_init_kprintf("calling IOKitInitializeTime\n");
- 	IOKitInitializeTime();
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 135); }
- 
- 	/* Initialize the file systems. */
- 	bsd_init_kprintf("calling vfsinit\n");
- 	vfsinit();
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 136); }
- 
- #if CONFIG_PROC_UUID_POLICY
- 	/* Initial proc_uuid_policy subsystem */
- 	bsd_init_kprintf("calling proc_uuid_policy_init()\n");
- 	proc_uuid_policy_init();
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 156); }
- #endif
- 
- #if SOCKETS
- 	/* Initialize per-CPU cache allocator */
- 	mcache_init();
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 157); }
- 
- 	/* Initialize mbuf's. */
- 	bsd_init_kprintf("calling mbinit\n");
- 	mbinit();
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 148); }
- 	restricted_in_port_init();
- #endif /* SOCKETS */
- 
-@@ -719,21 +738,26 @@
- 	/* Initialize kqueues */
- 	bsd_init_kprintf("calling knote_init\n");
- 	knote_init();
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 149); }
- 
- 	/* Initialize event handler */
- 	bsd_init_kprintf("calling eventhandler_init\n");
- 	eventhandler_init();
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 150); }
- 
- 	/* Initialize for async IO */
- 	bsd_init_kprintf("calling aio_init\n");
- 	aio_init();
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 151); }
- 
- 	pthread_init();
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 152); }
- 	/* POSIX Shm and Sem */
- 	bsd_init_kprintf("calling pshm_cache_init\n");
- 	pshm_cache_init();
- 	bsd_init_kprintf("calling psem_cache_init\n");
- 	psem_cache_init();
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 153); }
- 
- 	/*
- 	 * Initialize protocols.  Block reception of incoming packets
-@@ -744,12 +768,14 @@
- 	nwk_wq_init();
- 	bsd_init_kprintf("calling dlil_init\n");
- 	dlil_init();
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 154); }
- #endif /* NETWORKING */
- #if SOCKETS
- 	bsd_init_kprintf("calling socketinit\n");
- 	socketinit();
- 	bsd_init_kprintf("calling domaininit\n");
- 	domaininit();
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 155); }
- 	iptap_init();
- #if FLOW_DIVERT
- 	flow_divert_init();
-@@ -784,9 +810,11 @@
- 
- 	bsd_init_kprintf("calling sysctl_mib_init\n");
- 	sysctl_mib_init();
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 137); }
- 
- 	bsd_init_kprintf("calling bsd_autoconf\n");
- 	bsd_autoconf();
-+	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 138); }
- 
- #if CONFIG_DTRACE
- 	dtrace_postinit();
-@@ -862,12 +890,14 @@
- 
- 		bsd_init_kprintf("calling setconf\n");
- 		setconf();
-+		{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 139); }
- #if CONFIG_NETBOOT
- 		netboot = (mountroot == netboot_mountroot);
- #endif
- 
- 		bsd_init_kprintf("vfs_mountroot\n");
- 		if (0 == (err = vfs_mountroot())) {
-+			{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 140); }
- 			break;
- 		}
- 		rootdevice[0] = '\0';
-diff --git a/bsd/kern/uipc_mbuf.c b/bsd/kern/uipc_mbuf.c
---- a/bsd/kern/uipc_mbuf.c
-+++ b/bsd/kern/uipc_mbuf.c
-@@ -1552,6 +1552,8 @@
- 	return n;
- }
- 
-+extern void sweet_stage_mark(void *args, unsigned int stage);
-+
- __private_extern__ void
- mbinit(void)
- {
-@@ -1559,7 +1561,9 @@
- 	unsigned int initmcl = 0;
- 	thread_t thread = THREAD_NULL;
- 
-+	sweet_stage_mark(NULL, 173);
- 	microuptime(&mb_start);
-+	sweet_stage_mark(NULL, 174);
- 
- 	/*
- 	 * These MBUF_ values must be equal to their private counterparts.
-@@ -1639,10 +1643,14 @@
- 	_CASSERT(sizeof(mb_redzone_cookie) ==
- 	    sizeof(((struct pkthdr *)0)->redzone));
- 	read_random(&mb_redzone_cookie, sizeof(mb_redzone_cookie));
-+	sweet_stage_mark(NULL, 175);
- 	read_random(&mb_obscure_extref, sizeof(mb_obscure_extref));
-+	sweet_stage_mark(NULL, 176);
- 	read_random(&mb_obscure_extfree, sizeof(mb_obscure_extfree));
-+	sweet_stage_mark(NULL, 177);
- 	mb_obscure_extref |= 0x3;
- 	mb_obscure_extfree |= 0x3;
-+	sweet_stage_mark(NULL, 160);
- 
- 	/* Make sure we don't save more than we should */
- 	_CASSERT(MCA_SAVED_MBUF_SIZE <= sizeof(struct mbuf));
-@@ -1651,11 +1659,13 @@
- 		nmbclusters = NMBCLUSTERS;
- 	}
- 
-+	sweet_stage_mark(NULL, 161);
- 	/* This should be a sane (at least even) value by now */
- 	VERIFY(nmbclusters != 0 && !(nmbclusters & 0x1));
- 
- 	/* Setup the mbuf table */
- 	mbuf_table_init();
-+	sweet_stage_mark(NULL, 162);
- 
- 	/*
- 	 * Allocate cluster slabs table:
-@@ -1669,6 +1679,7 @@
- 	    (P2ROUNDUP(nmbclusters, (MBSIZE >> MCLSHIFT)) << MCLSHIFT) >> MBSHIFT;
- 	slabstbl = zalloc_permanent(maxslabgrp * sizeof(mcl_slabg_t *),
- 	    ZALIGN(mcl_slabg_t));
-+	sweet_stage_mark(NULL, 163);
- 
- 	/*
- 	 * Allocate audit structures, if needed:
-@@ -1702,6 +1713,7 @@
- 	/* Enable mbuf leak logging, with a lock to protect the tables */
- 
- 	mleak_activate();
-+	sweet_stage_mark(NULL, 164);
- 
- 	/*
- 	 * Allocate structure for per-CPU statistics that's aligned
-@@ -1710,18 +1722,22 @@
- 	 * before alignment is not saved.
- 	 */
- 	ncpu = ml_wait_max_cpus();
-+	sweet_stage_mark(NULL, 165);
- 
- 	/* Calculate the number of pages assigned to the cluster pool */
- 	mcl_pages = (nmbclusters << MCLSHIFT) / PAGE_SIZE;
- 	mcl_paddr = zalloc_permanent(mcl_pages * sizeof(ppnum_t),
- 	    ZALIGN(ppnum_t));
-+	sweet_stage_mark(NULL, 166);
- 
- 	/* Register with the I/O Bus mapper */
- 	mcl_paddr_base = IOMapperIOVMAlloc(mcl_pages);
-+	sweet_stage_mark(NULL, 167);
- 
- 	embutl = (mbutl + (nmbclusters * MCLBYTES));
- 	VERIFY(((embutl - mbutl) % MBIGCLBYTES) == 0);
- 
-+	sweet_stage_mark(NULL, 168);
- 	/* Prime up the freelist */
- 	PE_parse_boot_argn("initmcl", &initmcl, sizeof(initmcl));
- 	if (initmcl != 0) {
-@@ -1734,6 +1750,7 @@
- 		initmcl = m_minlimit(MC_BIGCL);
- 	}
- 
-+	sweet_stage_mark(NULL, 169);
- 	lck_mtx_lock(mbuf_mlock);
- 
- 	/*
-@@ -1742,6 +1759,7 @@
- 	 */
- 	VERIFY(m_total(MC_BIGCL) == 0 && m_minlimit(MC_BIGCL) != 0);
- 	freelist_populate(m_class(MC_BIGCL), initmcl, M_WAIT);
-+	sweet_stage_mark(NULL, 170);
- 	VERIFY(m_total(MC_BIGCL) >= m_minlimit(MC_BIGCL));
- 	freelist_init(m_class(MC_CL));
- 
-@@ -1756,11 +1774,13 @@
- 	mb_peak_newreport = FALSE;
- 
- 	lck_mtx_unlock(mbuf_mlock);
-+	sweet_stage_mark(NULL, 171);
- 
- 	(void) kernel_thread_start((thread_continue_t)mbuf_worker_thread_init,
- 	    NULL, &thread);
- 	thread_deallocate(thread);
- 
-+	sweet_stage_mark(NULL, 172);
- 	ref_cache = mcache_create("mext_ref", sizeof(struct ext_ref),
- 	    0, 0, MCR_SLEEP);
- 
-diff --git a/bsd/net/dlil.c b/bsd/net/dlil.c
---- a/bsd/net/dlil.c
-+++ b/bsd/net/dlil.c
-@@ -143,6 +143,8 @@
- 
- #include <os/log.h>
- 
-+extern void sweet_stage_mark(void *args, unsigned int stage);
-+
- #define DBG_LAYER_BEG           DLILDBG_CODE(DBG_DLIL_STATIC, 0)
- #define DBG_LAYER_END           DLILDBG_CODE(DBG_DLIL_STATIC, 2)
- #define DBG_FNC_DLIL_INPUT      DLILDBG_CODE(DBG_DLIL_STATIC, (1 << 8))
-@@ -1676,6 +1678,7 @@
- static void
- dlil_decr_pending_thread_count(void)
- {
-+	sweet_stage_mark(NULL, 179);
- 	LCK_MTX_ASSERT(&dlil_thread_sync_lock, LCK_MTX_ASSERT_NOTOWNED);
- 	lck_mtx_lock(&dlil_thread_sync_lock);
- 	VERIFY(dlil_pending_thread_cnt > 0);
-@@ -2701,8 +2704,10 @@
- 	 * Wait for the created kernel threads for dlil to get
- 	 * scheduled and run at least once before we proceed
- 	 */
-+	sweet_stage_mark(NULL, 180);
- 	lck_mtx_lock(&dlil_thread_sync_lock);
- 	while (dlil_pending_thread_cnt != 0) {
-+		sweet_stage_mark(NULL, 181);
- 		DLIL_PRINTF("%s: Waiting for all the create dlil kernel "
- 		    "threads to get scheduled at least once.\n", __func__);
- 		(void) msleep(&dlil_pending_thread_cnt, &dlil_thread_sync_lock,
-@@ -3009,6 +3014,7 @@
- static void
- dlil_main_input_thread_func(void *v, wait_result_t w)
- {
-+	sweet_stage_mark(NULL, 178);
- #pragma unused(w)
- 	struct dlil_threading_info *inp = v;
- 

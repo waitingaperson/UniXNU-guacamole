@@ -408,6 +408,10 @@
   `max_cpus_lock` there faults. r65 moves the call to `machine_conf()`
   (after the locks are up and the topology is final).
 
+- **r65 reaches stage 157.** `mcache_init()` now returns (`ml_wait_max_cpus`
+  gets its flag from `machine_conf`); the hang is inside `mbinit()`
+  (`bsd/kern/uipc_mbuf.c`). r66 adds stage markers 160-171 across `mbinit`.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

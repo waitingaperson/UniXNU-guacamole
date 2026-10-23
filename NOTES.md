@@ -443,6 +443,14 @@
   dlil thread entry (178), the pending-count decrement (179) and the wait
   (180/181) to tell scheduler failure from a thread-side panic.
 
+- r73 shows the framebuffer console: kprintf goes through `vcputc` once
+  `PE_initialize_console(kPETextScreen)` asks for the text screen (the screen
+  acquire otherwise runs in graphics mode and disables the text console).
+  The visible panic is `Unable to find driver for this platform: "D22AP"` in
+  `IOPanicPlatform::start` (`IOPlatformExpert.cpp:2341`): the kernel has no
+  platform kext, so the catch-all personality matched. r74 makes the fallback
+  subclass call `IOPlatformExpert::start` and log instead of panicking.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

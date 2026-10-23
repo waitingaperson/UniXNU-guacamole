@@ -340,6 +340,13 @@
 - r57 marks around `corecrypto_kext_start` (123/124) and switches the UUID
   guard to `!APPLE_ARM64_ARCH_FAMILY`.
 
+- **r57 stops at stage 123**, i.e. immediately before
+  `corecrypto_kext_start`. The FIPS POST (`fipspost_post`) is the suspect:
+  it returns immediately when the `fips_mode` DISABLE flag (0x4) is set.
+  The bootstrap guard panics on any nonzero `fips_mode`, so r58 allows
+  `fips_mode=4` and adds it to the board arguments; the POST is skipped and
+  the KPI table is still registered.
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

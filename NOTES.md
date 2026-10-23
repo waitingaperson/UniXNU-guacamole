@@ -422,6 +422,14 @@
   173-177 at `mbinit` entry, after `microuptime` and after each
   `read_random`, which bisects the first lines of `mbinit`.
 
+- **r68 reaches stage 166.** `mbinit` runs through the reads, `mbuf_table_init`,
+  `slabstbl`, `mleak_activate`, `ml_wait_max_cpus` and the `mcl_paddr`
+  allocation; the hang is `IOMapperIOVMAlloc()`: the platform expert
+  registered a required system mapper, so `checkForSystemMapper()` sleeps in
+  `waitForSystemMapper()` for an IOMMU that this port does not have. r69
+  forces `IOMapper::setMapperRequired(false)` (`mcl_paddr_base` becomes 0,
+  i.e. physical-address passthrough).
+
 ## 2026-10-21: project split
 
 - The UEFI/UniXNU bring-up is now a separate project (`UniXNU-guacamole`).

@@ -1,7 +1,7 @@
 diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 --- a/osfmk/arm64/sweet_stage.c
 +++ b/osfmk/arm64/sweet_stage.c
-@@ -1,25 +1,138 @@
+@@ -1,25 +1,140 @@
  /*
   * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
   * of the boot framebuffer V=P, so these writes work from C with the MMU on
@@ -98,7 +98,7 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +	if (args == NULL) {
 +		args = sweet_stage_args;
 +	}
-+	static const uint32_t colors[152] = {
++	static const uint32_t colors[160] = {
  		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
  		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
  		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
@@ -137,15 +137,17 @@ diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 +		0xffc00000u, 0xff00c000u, 0xff0000c0u, 0xffc0c000u,
 +		0xff00c0c0u, 0xffc000c0u, 0xff808000u, 0xff008080u,
 +		0xffff8080u, 0xff80ff80u, 0xff8080ffu, 0xffffff80u,
-+		0xff80ffffu, 0xffff80ffu, 0xffc0c0c0u, 0xff606060u
++		0xff80ffffu, 0xffff80ffu, 0xffc0c0c0u, 0xff606060u,
++		0xffff0000u, 0xff00ff00u, 0xff0000ffu, 0xffffff00u,
++		0xff00ffffu, 0xffff00ffu, 0xff9f9f9fu, 0xff5f5f5fu
  	};
  
 -	if (args == NULL || stage > 15) {
-+	if (args == NULL || stage > 151) {
++	if (args == NULL || stage > 159) {
  		return;
  	}
  	uint64_t base = args->Video.v_baseAddr;
-@@ -31,19 +144,27 @@
+@@ -31,19 +146,27 @@
  	if (stage == 0) {
  		for (uint32_t row = 0; row < 144; row++) {
  			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
@@ -1125,7 +1127,7 @@ diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
  
  #if defined (__i386__) || defined (__x86_64__)
  	/*
-@@ -680,16 +693,19 @@
+@@ -680,30 +693,36 @@
  	 */
  	bsd_init_kprintf("calling bsd_bufferinit\n");
  	bsd_bufferinit();
@@ -1145,7 +1147,66 @@ diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
  
  #if CONFIG_PROC_UUID_POLICY
  	/* Initial proc_uuid_policy subsystem */
-@@ -784,9 +800,11 @@
+ 	bsd_init_kprintf("calling proc_uuid_policy_init()\n");
+ 	proc_uuid_policy_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 156); }
+ #endif
+ 
+ #if SOCKETS
+ 	/* Initialize per-CPU cache allocator */
+ 	mcache_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 157); }
+ 
+ 	/* Initialize mbuf's. */
+ 	bsd_init_kprintf("calling mbinit\n");
+ 	mbinit();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 148); }
+ 	restricted_in_port_init();
+ #endif /* SOCKETS */
+ 
+@@ -719,21 +738,26 @@
+ 	/* Initialize kqueues */
+ 	bsd_init_kprintf("calling knote_init\n");
+ 	knote_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 149); }
+ 
+ 	/* Initialize event handler */
+ 	bsd_init_kprintf("calling eventhandler_init\n");
+ 	eventhandler_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 150); }
+ 
+ 	/* Initialize for async IO */
+ 	bsd_init_kprintf("calling aio_init\n");
+ 	aio_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 151); }
+ 
+ 	pthread_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 152); }
+ 	/* POSIX Shm and Sem */
+ 	bsd_init_kprintf("calling pshm_cache_init\n");
+ 	pshm_cache_init();
+ 	bsd_init_kprintf("calling psem_cache_init\n");
+ 	psem_cache_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 153); }
+ 
+ 	/*
+ 	 * Initialize protocols.  Block reception of incoming packets
+@@ -744,12 +768,14 @@
+ 	nwk_wq_init();
+ 	bsd_init_kprintf("calling dlil_init\n");
+ 	dlil_init();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 154); }
+ #endif /* NETWORKING */
+ #if SOCKETS
+ 	bsd_init_kprintf("calling socketinit\n");
+ 	socketinit();
+ 	bsd_init_kprintf("calling domaininit\n");
+ 	domaininit();
++	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 155); }
+ 	iptap_init();
+ #if FLOW_DIVERT
+ 	flow_divert_init();
+@@ -784,9 +810,11 @@
  
  	bsd_init_kprintf("calling sysctl_mib_init\n");
  	sysctl_mib_init();
@@ -1157,7 +1218,7 @@ diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
  
  #if CONFIG_DTRACE
  	dtrace_postinit();
-@@ -862,12 +880,14 @@
+@@ -862,12 +890,14 @@
  
  		bsd_init_kprintf("calling setconf\n");
  		setconf();

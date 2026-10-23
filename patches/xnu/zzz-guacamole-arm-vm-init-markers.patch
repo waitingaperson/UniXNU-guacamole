@@ -346,13 +346,14 @@ diff -r C6/bsd/net/dlil.c B6/bsd/net/dlil.c
  	 * and create a workloop starter thread to invoke the if_start callback
 diff -r C6/bsd/net/if_loop.c B6/bsd/net/if_loop.c
 --- C6/bsd/net/if_loop.c	2026-10-23 23:17:10.520634531 +0800
-+++ B6/bsd/net/if_loop.c	2026-10-24 00:10:11.622363906 +0800
-@@ -634,11 +634,16 @@
++++ B6/bsd/net/if_loop.c	2026-10-24 00:16:00.903152312 +0800
+@@ -633,12 +633,17 @@
+ }
  
  /* ARGSUSED */
- void
 +extern void sweet_stage_mark(void *args, unsigned int stage);
 +
+ void
  loopattach(void)
  {
  	struct ifnet_init_eparams lo_init;

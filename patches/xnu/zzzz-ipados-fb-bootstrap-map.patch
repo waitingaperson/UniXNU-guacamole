@@ -418,19 +418,20 @@ index f9a166f..d2f9238 100644
  	int howmany;
  	mach_msg_id_t j, pos, nentry, range;
 diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
-index 9114c0d..0d1d9af 100644
+index 9114c0d..6477f25 100644
 --- a/osfmk/kern/startup.c
 +++ b/osfmk/kern/startup.c
-@@ -107,6 +107,8 @@
+@@ -107,6 +107,9 @@
  #include <corpses/task_corpse.h>
  #include <prng/random.h>
  #include <console/serial_protos.h>
++#include <pexpert/pexpert.h>
 +
 +extern void sweet_stage_mark(struct boot_args *args, unsigned int stage);
  #include <vm/vm_kern.h>
  #include <vm/vm_init.h>
  #include <vm/vm_map.h>
-@@ -431,6 +433,8 @@ kernel_bootstrap(void)
+@@ -431,6 +434,8 @@ kernel_bootstrap(void)
  
  	code_signing_config_t cs_config;
  
@@ -439,16 +440,25 @@ index 9114c0d..0d1d9af 100644
  	printf("%s\n", version); /* log kernel version */
  
  	scale_setup();
-@@ -438,6 +442,8 @@ kernel_bootstrap(void)
+@@ -438,6 +443,17 @@ kernel_bootstrap(void)
  	kernel_bootstrap_log("vm_mem_bootstrap");
  	vm_mem_bootstrap();
  
 +	sweet_stage_mark(NULL, 63);
 +
++	/*
++	 * Guacamole: attach the video console as soon as the VM is up so
++	 * panics and kprintf output are visible on the framebuffer instead
++	 * of only reaching the message buffer.
++	 */
++	PE_init_printf(TRUE);
++
++	sweet_stage_mark(NULL, 79);
++
  	machine_info.memory_size = (uint32_t)mem_size;
  #if XNU_TARGET_OS_OSX
  	machine_info.max_mem = max_mem_actual;
-@@ -454,6 +460,8 @@ kernel_bootstrap(void)
+@@ -454,6 +470,8 @@ kernel_bootstrap(void)
  #endif
  	kernel_startup_initialize_upto(STARTUP_SUB_OSLOG);
  
@@ -457,7 +467,7 @@ index 9114c0d..0d1d9af 100644
  #if CONFIG_UBSAN_MINIMAL
  	kernel_bootstrap_log("UBSan minimal runtime init");
  	ubsan_minimal_init();
-@@ -469,6 +477,8 @@ kernel_bootstrap(void)
+@@ -469,6 +487,8 @@ kernel_bootstrap(void)
  	telemetry_init();
  #endif
  
@@ -466,7 +476,7 @@ index 9114c0d..0d1d9af 100644
  	if (PE_i_can_has_debugger(NULL)) {
  		if (PE_parse_boot_argn("-show_pointers", &namep, sizeof(namep))) {
  			doprnt_hide_pointers = FALSE;
-@@ -482,21 +492,32 @@ kernel_bootstrap(void)
+@@ -482,21 +502,32 @@ kernel_bootstrap(void)
  	}
  
  	kernel_bootstrap_log("console_init");
@@ -499,7 +509,7 @@ index 9114c0d..0d1d9af 100644
  	/*
  	 * As soon as the virtual memory system is up, we record
  	 * that this CPU is using the kernel pmap.
-@@ -636,6 +657,8 @@ kernel_bootstrap_thread(void)
+@@ -636,6 +667,8 @@ kernel_bootstrap_thread(void)
  	 */
  	kernel_startup_initialize_upto(STARTUP_SUB_THREAD_CALL);
  
@@ -508,7 +518,7 @@ index 9114c0d..0d1d9af 100644
  	/*
  	 * Remain on current processor as
  	 * additional processors come online.
-@@ -684,6 +707,8 @@ kernel_bootstrap_thread(void)
+@@ -684,6 +717,8 @@ kernel_bootstrap_thread(void)
  
  	kernel_startup_initialize_upto(STARTUP_SUB_SYSCTL);
  
@@ -517,7 +527,7 @@ index 9114c0d..0d1d9af 100644
  	/*
  	 * Initialize the globals used for permuting kernel
  	 * addresses that may be exported to userland as tokens
-@@ -699,7 +724,9 @@ kernel_bootstrap_thread(void)
+@@ -699,7 +734,9 @@ kernel_bootstrap_thread(void)
  
  #ifdef  IOKIT
  	kernel_bootstrap_log("PE_init_iokit");
@@ -527,7 +537,7 @@ index 9114c0d..0d1d9af 100644
  #endif
  
  	assert(ml_get_interrupts_enabled() == FALSE);
-@@ -710,6 +737,8 @@ kernel_bootstrap_thread(void)
+@@ -710,6 +747,8 @@ kernel_bootstrap_thread(void)
  	 */
  	kernel_startup_initialize_upto(STARTUP_SUB_EARLY_BOOT);
  
@@ -536,7 +546,7 @@ index 9114c0d..0d1d9af 100644
  #if SCHED_HYGIENE_DEBUG
  	// Reset interrupts masked timeout before we enable interrupts
  	ml_spin_debug_clear_self();
-@@ -769,6 +798,8 @@ kernel_bootstrap_thread(void)
+@@ -769,6 +808,8 @@ kernel_bootstrap_thread(void)
  
  	kernel_startup_initialize_upto(STARTUP_SUB_LOCKDOWN);
  
@@ -545,7 +555,7 @@ index 9114c0d..0d1d9af 100644
  	/*
  	 * Get rid of segments used to bootstrap kext loading. This removes
  	 * the KLD, PRELINK symtab, LINKEDIT, and symtab segments/load commands.
-@@ -789,6 +820,8 @@ kernel_bootstrap_thread(void)
+@@ -789,6 +830,8 @@ kernel_bootstrap_thread(void)
  	kernel_bootstrap_log("machine_lockdown");
  	machine_lockdown();
  
@@ -554,7 +564,7 @@ index 9114c0d..0d1d9af 100644
  #ifdef CONFIG_XNUPOST
  	kern_return_t result = kernel_list_tests();
  	result = kernel_do_post();
-@@ -817,6 +850,8 @@ kernel_bootstrap_thread(void)
+@@ -817,6 +860,8 @@ kernel_bootstrap_thread(void)
  	 *	Start the user bootstrap.
  	 */
  #ifdef  MACH_BSD

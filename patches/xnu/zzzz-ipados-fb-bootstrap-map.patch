@@ -298,8 +298,127 @@ index bca4c7c..9a5f645 100644
  
  	b		common_start
  
+diff --git a/osfmk/bank/bank.c b/osfmk/bank/bank.c
+index 47a52b5..98c3f1e 100644
+--- a/osfmk/bank/bank.c
++++ b/osfmk/bank/bank.c
+@@ -45,6 +45,8 @@
+ #include <IOKit/IOBSD.h>
+ #include <kern/policy_internal.h>
+ 
++extern void sweet_stage_mark(struct boot_args *args, unsigned int stage);
++
+ /* we can't include the BSD <sys/persona.h> header here... */
+ #ifndef PERSONA_ID_NONE
+ #define PERSONA_ID_NONE ((uint32_t)-1)
+@@ -200,6 +202,8 @@ __startup_func
+ static void
+ bank_init(void)
+ {
++	sweet_stage_mark(NULL, 90);
++
+ 	init_bank_ledgers();
+ 
+ 	/* Register the bank manager with the Vouchers sub system. */
+diff --git a/osfmk/ipc/ipc_importance.c b/osfmk/ipc/ipc_importance.c
+index 3ddf974..b98c9b7 100644
+--- a/osfmk/ipc/ipc_importance.c
++++ b/osfmk/ipc/ipc_importance.c
+@@ -47,6 +47,8 @@
+ 
+ #include <mach/machine/sdt.h>
+ 
++extern void sweet_stage_mark(struct boot_args *args, unsigned int stage);
++
+ extern int      proc_pid(void *);
+ extern int      proc_selfpid(void);
+ extern uint64_t proc_uniqueid(void *p);
+@@ -3805,6 +3807,8 @@ __startup_func
+ static void
+ ipc_importance_init(void)
+ {
++	sweet_stage_mark(NULL, 97);
++
+ 	ipc_register_well_known_mach_voucher_attr_manager(&ipc_importance_manager,
+ 	    (mach_voucher_attr_value_handle_t)0,
+ 	    MACH_VOUCHER_ATTR_KEY_IMPORTANCE,
+diff --git a/osfmk/ipc/ipc_init.c b/osfmk/ipc/ipc_init.c
+index 03a2049..8f26bb8 100644
+--- a/osfmk/ipc/ipc_init.c
++++ b/osfmk/ipc/ipc_init.c
+@@ -78,6 +78,8 @@
+ #include <kern/arcade.h>
+ #include <kern/kalloc.h>
+ #include <kern/simple_lock.h>
++
++extern void sweet_stage_mark(struct boot_args *args, unsigned int stage);
+ #include <kern/mach_param.h>
+ #include <kern/ipc_host.h>
+ #include <kern/ipc_kobject.h>
+@@ -152,6 +154,8 @@ __startup_func
+ static void
+ ipc_init(void)
+ {
++	sweet_stage_mark(NULL, 96);
++
+ 	kern_return_t kr;
+ 
+ 	/* create special spaces */
+diff --git a/osfmk/ipc/ipc_voucher.c b/osfmk/ipc/ipc_voucher.c
+index d214172..7388c68 100644
+--- a/osfmk/ipc/ipc_voucher.c
++++ b/osfmk/ipc/ipc_voucher.c
+@@ -46,6 +46,8 @@
+ #include <mach/mach_host_server.h>
+ #include <voucher/ipc_pthread_priority_types.h>
+ 
++extern void sweet_stage_mark(struct boot_args *args, unsigned int stage);
++
+ /*
+  * Sysctl variable; enable and disable tracing of voucher contents
+  */
+@@ -182,6 +184,8 @@ __startup_func
+ static void
+ ipc_voucher_init(void)
+ {
++	sweet_stage_mark(NULL, 93);
++
+ 	zone_enable_smr(zone_by_id(ZONE_ID_IPC_VOUCHERS), &smr_ipc, bzero);
+ 	smr_shash_init(&voucher_table, SMRSH_BALANCED, 128);
+ }
+@@ -2714,6 +2718,8 @@ __startup_func
+ static void
+ user_data_attr_manager_init(void)
+ {
++	sweet_stage_mark(NULL, 94);
++
+ #if defined(MACH_VOUCHER_ATTR_KEY_USER_DATA)
+ 	ipc_register_well_known_mach_voucher_attr_manager(&user_data_manager,
+ 	    (mach_voucher_attr_value_handle_t)0,
+diff --git a/osfmk/kern/ipc_kobject.c b/osfmk/kern/ipc_kobject.c
+index f9a166f..d2f9238 100644
+--- a/osfmk/kern/ipc_kobject.c
++++ b/osfmk/kern/ipc_kobject.c
+@@ -79,6 +79,8 @@
+ #include <mach/ndr.h>
+ #include <mach/vm_param.h>
+ 
++extern void sweet_stage_mark(struct boot_args *args, unsigned int stage);
++
+ #include <mach/mach_vm_server.h>
+ #include <mach/mach_port_server.h>
+ #include <mach/mach_host_server.h>
+@@ -231,6 +233,8 @@ __startup_func
+ static void
+ mig_init(void)
+ {
++	sweet_stage_mark(NULL, 91);
++
+ 	unsigned int i, n = sizeof(mig_e) / sizeof(const struct mig_kern_subsystem *);
+ 	int howmany;
+ 	mach_msg_id_t j, pos, nentry, range;
 diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
-index 9114c0d..cdbc24b 100644
+index 9114c0d..0d1d9af 100644
 --- a/osfmk/kern/startup.c
 +++ b/osfmk/kern/startup.c
 @@ -107,6 +107,8 @@
@@ -307,7 +426,7 @@ index 9114c0d..cdbc24b 100644
  #include <prng/random.h>
  #include <console/serial_protos.h>
 +
-+extern void sweet_stage_mark(void *args, unsigned int stage);
++extern void sweet_stage_mark(struct boot_args *args, unsigned int stage);
  #include <vm/vm_kern.h>
  #include <vm/vm_init.h>
  #include <vm/vm_map.h>
@@ -444,3 +563,47 @@ index 9114c0d..cdbc24b 100644
  	bsd_init();
  #endif
  
+diff --git a/osfmk/kern/waitq.c b/osfmk/kern/waitq.c
+index b17e296..706036a 100644
+--- a/osfmk/kern/waitq.c
++++ b/osfmk/kern/waitq.c
+@@ -75,6 +75,8 @@
+ 
+ #include <sys/kdebug.h>
+ 
++extern void sweet_stage_mark(struct boot_args *args, unsigned int stage);
++
+ /*!
+  * @const waitq_set_unlink_batch
+  *
+@@ -625,6 +627,8 @@ __startup_func
+ static void
+ waitq_bootstrap(void)
+ {
++	sweet_stage_mark(NULL, 92);
++
+ 	const uint32_t qsz = sizeof(struct waitq);
+ 	vm_offset_t whsize;
+ 	int cpu = 0;
+diff --git a/osfmk/voucher/ipc_pthread_priority.c b/osfmk/voucher/ipc_pthread_priority.c
+index 00f98ee..70ecc45 100644
+--- a/osfmk/voucher/ipc_pthread_priority.c
++++ b/osfmk/voucher/ipc_pthread_priority.c
+@@ -41,6 +41,8 @@
+ #include <IOKit/IOBSD.h>
+ #include <pthread/priority_private.h>
+ 
++extern void sweet_stage_mark(struct boot_args *args, unsigned int stage);
++
+ ipc_voucher_attr_control_t  ipc_pthread_priority_voucher_attr_control;    /* communication channel from PTHPRIORITY to voucher system */
+ 
+ #define PTHPRIORITY_ATTR_DEFAULT_VALUE (0)
+@@ -110,6 +112,8 @@ __startup_func
+ static void
+ ipc_pthread_priority_init(void)
+ {
++	sweet_stage_mark(NULL, 95);
++
+ 	/* Register the ipc_pthread_priority manager with the Vouchers sub system. */
+ 	ipc_register_well_known_mach_voucher_attr_manager(
+ 		&ipc_pthread_priority_manager,

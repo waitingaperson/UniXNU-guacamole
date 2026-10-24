@@ -105,6 +105,7 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
         ('dram-base', u64(phys_base)),
         ('dram-size', u64(mem_size)),
         *([('darwinboot-memory-size', u64(owned_memory_size))] if owned_memory_size else []),
+        ('embedded-panic-log-size', u32(dev.get('panic_size', 0x80000))),
         ('random-seed', seed),
         ('debug-enabled', u32(1)),
         ('firmware-version', cstr('sweet-shim')),
@@ -262,13 +263,15 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
             ('target-sub-type', cstr('D22AP')),
         ]
 
+    pram = node('pram', [ph(), ('reg', u64(dev['panic'], dev.get('panic_size', 0x80000)))])
+
     return node('device-tree', [
         ph(),
         *identity,
         ('manufacturer', cstr('Apple Inc.')),
         ('#address-cells', u32(2)),
         ('#size-cells', u32(2)),
-    ], [chosen, defaults, cpus, arm_io, fbcon, buttons] + product + ([] if qemu else [ufs]))
+    ], [chosen, defaults, cpus, arm_io, fbcon, buttons, pram] + product + ([] if qemu else [ufs]))
 
 
 if __name__ == '__main__':

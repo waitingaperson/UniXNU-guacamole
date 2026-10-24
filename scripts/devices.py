@@ -39,6 +39,8 @@ DEVICES = {
         # phys, virt, hyp): CNTV = INTID 16 + 3.
         'vtimer_intid': 19,
         # reserved-memory cont_splash_region that ABL leaves lit.
+        'panic': 0x9e400000,
+        'panic_size': 0x80000,
         'fb': 0x9c000000,
         'fb_size': 0x1700000,
         'fb_w': 1080,

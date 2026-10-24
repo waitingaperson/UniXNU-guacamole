@@ -1,3 +1,45 @@
+diff --git a/iokit/Kernel/IOUserServer.cpp b/iokit/Kernel/IOUserServer.cpp
+index bdef641..c02186e 100644
+--- a/iokit/Kernel/IOUserServer.cpp
++++ b/iokit/Kernel/IOUserServer.cpp
+@@ -6921,25 +6921,33 @@ IOSystemStateNotification::initialize(void)
+ 		gIOSystemStateSleepDescriptionReasonKey = OSSymbol::withCStringNoCopy(kIOSystemStateSleepDescriptionReasonKey);
+ 
+ 		ret = me->StateNotificationItemCreate(gIOSystemStateSleepDescriptionKey, NULL);
+-		assert(kIOReturnSuccess == ret);
++		if (ret != kIOReturnSuccess) {
++			IOLog("IOSystemStateNotification: sleep item create failed: 0x%x (continuing)\n", ret);
++		}
+ 
+ 		gIOSystemStateWakeDescriptionKey = (OSString *)OSSymbol::withCStringNoCopy(kIOSystemStateWakeDescriptionKey);
+ 		gIOSystemStateWakeDescriptionWakeReasonKey = OSSymbol::withCStringNoCopy(kIOSystemStateWakeDescriptionWakeReasonKey);
+ 
+ 		ret = me->StateNotificationItemCreate(gIOSystemStateWakeDescriptionKey, NULL);
+-		assert(kIOReturnSuccess == ret);
++		if (ret != kIOReturnSuccess) {
++			IOLog("IOSystemStateNotification: wake item create failed: 0x%x (continuing)\n", ret);
++		}
+ 
+ 		gIOSystemStateHaltDescriptionKey = (OSString *)OSSymbol::withCStringNoCopy(kIOSystemStateHaltDescriptionKey);
+ 		gIOSystemStateHaltDescriptionHaltStateKey = OSSymbol::withCStringNoCopy(kIOSystemStateHaltDescriptionHaltStateKey);
+ 
+ 		ret = me->StateNotificationItemCreate(gIOSystemStateHaltDescriptionKey, NULL);
+-		assert(kIOReturnSuccess == ret);
++		if (ret != kIOReturnSuccess) {
++			IOLog("IOSystemStateNotification: halt item create failed: 0x%x (continuing)\n", ret);
++		}
+ 
+ 		gIOSystemStatePowerSourceDescriptionKey = (OSString *)OSSymbol::withCStringNoCopy(kIOSystemStatePowerSourceDescriptionKey);
+ 		gIOSystemStatePowerSourceDescriptionACAttachedKey = OSSymbol::withCStringNoCopy(kIOSystemStatePowerSourceDescriptionACAttachedKey);
+ 
+ 		ret = me->StateNotificationItemCreate(gIOSystemStatePowerSourceDescriptionKey, NULL);
+-		assert(kIOReturnSuccess == ret);
++		if (ret != kIOReturnSuccess) {
++			IOLog("IOSystemStateNotification: power source item create failed: 0x%x (continuing)\n", ret);
++		}
+ 	}
+ 
+ 	return me;
 diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
 index c61727c..de28725 100644
 --- a/osfmk/arm/arm_init.c

@@ -1,0 +1,15 @@
+--- a/osfmk/arm/arm_init.c	2026-10-24 17:13:42.386594550 +0800
++++ b/osfmk/arm/arm_init.c	2026-10-24 17:13:42.403727903 +0800
+@@ -575,6 +575,12 @@
+ 		disableConsoleOutput = FALSE;     /* Allow printfs to happen */
+ 	}
+ 	PE_create_console();
++	/*
++	 * The screen acquire below runs in graphics mode, which disables the
++	 * kernel text console. Ask for the text screen so panic and bring-up
++	 * output is drawn on the framebuffer.
++	 */
++	PE_initialize_console(&PE_state.video, kPETextScreen);
+ 
+ 	/* setup console output */
+ 	PE_init_printf(FALSE);

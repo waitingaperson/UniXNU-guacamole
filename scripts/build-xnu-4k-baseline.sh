@@ -51,16 +51,31 @@ fi
 # Remove them first so earlier independent patches retain their idempotent checks.
 # The same holds for the boot-time GPU addon mount (zzy), which edits the owner Data mount function inside the systemos patch.
 # Reverse newest first; the loop below re-applies them in name order.
+# A patch that a later patch changed the context of no longer reverse-applies,
+# so keep an explicit stamp of what the work tree already contains: name and
+# content hash. A second pass over the same tree then skips it instead of
+# failing the forward apply.
+APPLIED_STAMP=$ROOT/.cache/xnu-work/.guacamole-applied
 for LATE_PATCH in "$ROOT/patches/xnu/zzz-boot-progress.patch" "$ROOT/patches/xnu/zzy-native-gpu-addon-mount.patch"; do
   if git -C .cache/xnu-work apply --reverse --check "$LATE_PATCH" >/dev/null 2>&1; then
     git -C .cache/xnu-work apply --reverse "$LATE_PATCH"
+    if [ -f "$APPLIED_STAMP" ]; then
+      grep -vF "$LATE_PATCH " "$APPLIED_STAMP" > "$APPLIED_STAMP.tmp" || true
+      mv "$APPLIED_STAMP.tmp" "$APPLIED_STAMP"
+    fi
   fi
 done
+touch "$APPLIED_STAMP"
 for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.patch; do
+  PATCH_STAMP="$PATCH $(shasum -a 256 "$PATCH" | cut -d' ' -f1)"
+  if grep -qxF "$PATCH_STAMP" "$APPLIED_STAMP"; then
+    continue
+  fi
   if ! git -C .cache/xnu-work apply --reverse --check "$PATCH" >/dev/null 2>&1; then
     git -C .cache/xnu-work apply --check "$PATCH"
     git -C .cache/xnu-work apply "$PATCH"
   fi
+  printf '%s\n' "$PATCH_STAMP" >> "$APPLIED_STAMP"
 done
 export XNU_AVAILABILITY_PL=$ROOT/.cache/fakeroot/usr/local/libexec/availability.pl
 python3 scripts/prepare-xnu-source.py

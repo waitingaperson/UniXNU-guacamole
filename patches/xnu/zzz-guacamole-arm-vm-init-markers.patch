@@ -690,17 +690,28 @@ diff -r C6/iokit/Kernel/IOPlatformExpert.cpp B6/iokit/Kernel/IOPlatformExpert.cp
  }
 diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
 --- C6/osfmk/arm/arm_init.c	2026-10-23 23:33:18.159317562 +0800
-+++ B6/osfmk/arm/arm_init.c	2026-10-23 23:38:01.786779782 +0800
-@@ -347,6 +347,8 @@
++++ B6/osfmk/arm/arm_init.c	2026-10-24 09:27:45.362895823 +0800
+@@ -347,6 +347,9 @@
  	DTEntry chosen = NULL;
  	unsigned int dt_entry_size = 0;
  
 +	extern void sweet_stage_set_args(boot_args *args);
 +	sweet_stage_set_args(args);
++	printf("SWEET: cmdline: %s\n", args->CommandLine);
  	sweet_stage_mark(args, 0);
  	arm_setup_pre_sign();
  	sweet_stage_mark(args, 8);
-@@ -537,6 +539,7 @@
+@@ -497,6 +500,9 @@
+ 	} else {
+ 		xmaxmem = 0;
+ 	}
++	printf("SWEET: xmaxmem=0x%llx memSize=0x%llx memSizeActual=0x%llx\n",
++	    (unsigned long long)xmaxmem, (unsigned long long)args->memSize,
++	    (unsigned long long)args->memSizeActual);
+ 
+ #if SCHED_HYGIENE_DEBUG
+ 	{
+@@ -537,6 +543,7 @@
  
  	sweet_stage_mark(args, 7);
  	arm_vm_init(xmaxmem, args);
@@ -708,7 +719,7 @@ diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
  
  	if (debug_boot_arg) {
  		patch_low_glo();
-@@ -547,10 +550,13 @@
+@@ -547,10 +554,13 @@
  #endif
  
  	PE_consistent_debug_inherit();
@@ -722,7 +733,7 @@ diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
  	kprintf("kprintf initialized\n");
  
  	serialmode = 0;
-@@ -584,6 +590,7 @@
+@@ -584,6 +594,7 @@
  	if (kern_feature_override(KF_SERIAL_OVRD)) {
  		serialmode = 0;
  	}
@@ -730,7 +741,7 @@ diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
  
  	/* Start serial if requested and a serial device was enumerated in serial_init(). */
  	if ((serialmode & SERIALMODE_OUTPUT) && serial_exists) {
-@@ -592,9 +599,17 @@
+@@ -592,9 +603,17 @@
  		disableConsoleOutput = FALSE;     /* Allow printfs to happen */
  	}
  	PE_create_console();
@@ -748,7 +759,7 @@ diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
  
  #if __arm64__
  #if DEBUG
-@@ -603,8 +618,10 @@
+@@ -603,8 +622,10 @@
  #endif
  
  	cpu_machine_idle_init(TRUE);
@@ -759,7 +770,7 @@ diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
  
  #if __arm64__
  	extern bool cpu_config_correct;
-@@ -613,6 +630,7 @@
+@@ -613,6 +634,7 @@
  	}
  
  	ml_map_cpu_pio();
@@ -767,7 +778,7 @@ diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
  
  #if APPLE_ARM64_ARCH_FAMILY
  	configure_late_apple_regs();
-@@ -621,6 +639,7 @@
+@@ -621,6 +643,7 @@
  #endif
  
  	cpu_timebase_init(TRUE);
@@ -775,7 +786,7 @@ diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
  
  #if KPERF
  	/* kptimer_curcpu_up() must be called after cpu_timebase_init */
-@@ -628,7 +647,9 @@
+@@ -628,7 +651,9 @@
  #endif /* KPERF */
  
  	PE_init_cpu();
@@ -785,7 +796,7 @@ diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
  
  
  #if HIBERNATION
-@@ -654,9 +675,11 @@
+@@ -654,9 +679,11 @@
  	if (SecureDTGetProperty(chosen, "dram-size", (void const **)&dram_size, &dt_entry_size) != kSuccess) {
  		panic("%s: Unable to find 'dram-size' entry in the 'chosen' DT node", __FUNCTION__);
  	}
@@ -797,7 +808,7 @@ diff -r C6/osfmk/arm/arm_init.c B6/osfmk/arm/arm_init.c
  
  	/*
  	 * Initialize the stack protector for all future calls
-@@ -670,6 +693,7 @@
+@@ -670,6 +697,7 @@
  	 * against string vulnerabilities
  	 */
  	__stack_chk_guard &= ~(0xFFULL << 8);
@@ -824,7 +835,7 @@ diff -r C6/osfmk/arm/machine_routines_common.c B6/osfmk/arm/machine_routines_com
  void
 diff -r C6/osfmk/arm64/arm_vm_init.c B6/osfmk/arm64/arm_vm_init.c
 --- C6/osfmk/arm64/arm_vm_init.c	2026-10-23 23:33:18.165670859 +0800
-+++ B6/osfmk/arm64/arm_vm_init.c	2026-10-23 23:17:10.875369607 +0800
++++ B6/osfmk/arm64/arm_vm_init.c	2026-10-24 09:27:45.363072827 +0800
 @@ -1809,9 +1809,86 @@
  	}
  }
@@ -929,7 +940,17 @@ diff -r C6/osfmk/arm64/arm_vm_init.c B6/osfmk/arm64/arm_vm_init.c
  #if KASAN
  	real_phys_size = args->memSize + (shadow_ptop - shadow_pbase);
  #else
-@@ -1911,6 +1993,8 @@
+@@ -1854,6 +1936,9 @@
+ 	} else {
+ 		max_mem_actual = mem_actual;
+ 	}
++	printf("SWEET: vm mem_size=0x%llx mem_actual=0x%llx real_phys=0x%llx memory_size=0x%llx\n",
++	    (unsigned long long)mem_size, (unsigned long long)mem_actual,
++	    (unsigned long long)real_phys_size, (unsigned long long)memory_size);
+ 	if (mem_size >= ((VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS) / 2)) {
+ 		panic("Unsupported memory configuration %lx", mem_size);
+ 	}
+@@ -1911,6 +1996,8 @@
  		panic("Unsupported memory configuration %lx", mem_size);
  	}
  
@@ -938,7 +959,7 @@ diff -r C6/osfmk/arm64/arm_vm_init.c B6/osfmk/arm64/arm_vm_init.c
  	boot_tte = (tt_entry_t *)&bootstrap_pagetables;
  	boot_ttep = kvtophys((vm_offset_t)boot_tte);
  
-@@ -2127,6 +2211,9 @@
+@@ -2127,6 +2214,9 @@
  	init_ptpages(cpu_tte, dynamic_memory_begin, VM_MAX_KERNEL_ADDRESS, TRUE, ARM_DYNAMIC_TABLE_XN | ARM_TTE_TABLE_AP(ARM_TTE_TABLE_AP_USER_NA));
  #endif
  
@@ -948,7 +969,7 @@ diff -r C6/osfmk/arm64/arm_vm_init.c B6/osfmk/arm64/arm_vm_init.c
  #if KASAN
  	/* record the extent of the physmap */
  	physmap_vbase = physmap_base;
-@@ -2140,21 +2227,66 @@
+@@ -2140,21 +2230,66 @@
  
  	arm_set_user_tbi();
  
@@ -1017,7 +1038,7 @@ diff -r C6/osfmk/arm64/arm_vm_init.c B6/osfmk/arm64/arm_vm_init.c
  	// From here on out, we're off the bootstrap translation tables.
  
  
-@@ -2248,6 +2380,8 @@
+@@ -2248,6 +2383,8 @@
  #endif
  	pmap_bootstrap(dynamic_memory_begin);
  
@@ -1026,7 +1047,7 @@ diff -r C6/osfmk/arm64/arm_vm_init.c B6/osfmk/arm64/arm_vm_init.c
  	disable_preemption();
  
  	/*
-@@ -2298,6 +2432,8 @@
+@@ -2298,6 +2435,8 @@
  		cpu_l1_tte++;
  	}
  

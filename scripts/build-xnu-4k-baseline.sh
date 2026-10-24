@@ -789,9 +789,12 @@ PY
 EXTRA_CFLAGS="$EXTRA_CFLAGS -DXNU_BOOT_PROGRESS=$BOOT_PROGRESS"
 # Xcode 16.1's iig output omits IORPC.h; the kernel iokit C++ code needs it.
 EXTRA_MAKE_ARGS+=("OTHER_CXXFLAGS=-include IOKit/IORPC.h")
-# xnu-10063 moved IORPCMessageFromMach behind #ifndef KERNEL; the kernel's
-# iig Dispatch still calls it, so ask iig for the kernel implementation.
-EXTRA_MAKE_ARGS+=("OTHER_IIG_FLAGS=--kernel")
+# Log the iig options once: the 10063 kernel needs its implementation mode.
+IIG_BIN=$(xcrun --sdk "${XNU_SDKROOT:-iphoneos}" -find iig 2>/dev/null || true)
+if [ -n "$IIG_BIN" ]; then
+  echo "iig binary: $IIG_BIN"
+  "$IIG_BIN" --help 2>&1 | head -80 || true
+fi
 make -C .cache/xnu-work "${XNU_BUILD_TARGET:-build}" SDKROOT="${XNU_SDKROOT:-iphoneos}" ARCH_CONFIGS=ARM64 \
   MACHINE_CONFIGS=BCM2837 KERNEL_CONFIGS=DEVELOPMENT \
   ARCH_STRING_FOR_CURRENT_MACHINE_CONFIG=arm64 LARGE_MEMORY_DEFINE=-UARM_LARGE_MEMORY \

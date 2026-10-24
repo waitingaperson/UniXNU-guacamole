@@ -106,6 +106,11 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
         ('dram-size', u64(mem_size)),
         *([('darwinboot-memory-size', u64(owned_memory_size))] if owned_memory_size else []),
         ('embedded-panic-log-size', u32(dev.get('panic_size', 0x80000))),
+        # IODTNVRAM picks its CHRP/V3 handler from these /chosen properties;
+        # without them the platform expert panics in initImageFormat().
+        ('nvram-bank-size', u32(0x2000)),
+        ('nvram-bank-count', u32(2)),
+        ('nvram-current-bank', u32(0)),
         ('random-seed', seed),
         ('debug-enabled', u32(1)),
         ('firmware-version', cstr('sweet-shim')),
@@ -145,7 +150,10 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
         # debugger, dtrace, nvram), lp-sip1: unauthenticated (unsealed) root.
         # The iOS shared cache is in no trust cache, so dyld can only map it
         # with CSR_ALLOW_UNRESTRICTED_FS (vm_unix.c shared region checks).
-        node('asmb', [ph(), ('lp-sip0', u64(0x6f)), ('lp-sip1', u32(1))])])
+        node('asmb', [ph(), ('lp-sip0', u64(0x6f)), ('lp-sip1', u32(1))]),
+        # AppleImage4's pmap_cs init looks this up from /chosen; DarwinBoot has
+        # no manifest to export, so publish an empty node instead.
+        node('manifest-properties', [ph()])])
 
     # SWEET SMP: all cores in physical-core order as one homogeneous cluster
     # (sweet: 0-5 A55 + 6-7 A76; guacamole: 0-3 A55 + 4-7 A76). The kernel
@@ -227,6 +235,9 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
     # No effaceable storage: keybagd then reads /private/var/keybags/systembag.kb
     # as a plain plist instead of decrypting it with the effaceable key.
     defaults = node('defaults', [ph(), ('no-effaceable-storage', u32(1))])
+    # IODTPlatformExpert publishes /options as IODTNVRAM; without the node the
+    # platform expert asserts in processTopLevel().
+    options = node('options', [ph()])
 
     # MobileGestalt HomeButtonType = IODeviceTree:/buttons home-button-type
     # (D22AP: 2, no Home button; absent = 0 = Home-button device).
@@ -271,7 +282,7 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
         ('manufacturer', cstr('Apple Inc.')),
         ('#address-cells', u32(2)),
         ('#size-cells', u32(2)),
-    ], [chosen, defaults, cpus, arm_io, fbcon, buttons, pram] + product + ([] if qemu else [ufs]))
+    ], [chosen, options, defaults, cpus, arm_io, fbcon, buttons, pram] + product + ([] if qemu else [ufs]))
 
 
 if __name__ == '__main__':

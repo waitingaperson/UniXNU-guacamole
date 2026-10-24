@@ -88,6 +88,8 @@ DEVICES = {
         # confirmed on the GM1910's live FDT. The mainline port drives the same
         # range as a simple-framebuffer (1440x3120, stride 5760, a8r8g8b8).
         'fb': 0x9c000000,
+        'panic': 0x9e400000,
+        'panic_size': 0x80000,
         'fb_size': 0x2400000,
         'fb_w': 1440,
         'fb_h': 3120,

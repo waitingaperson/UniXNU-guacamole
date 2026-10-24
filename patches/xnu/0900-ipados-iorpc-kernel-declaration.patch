@@ -1,0 +1,20 @@
+--- a/iokit/IOKit/IORPC.h	2026-10-24 16:10:31.907386487 +0800
++++ b/iokit/IOKit/IORPC.h	2026-10-24 16:10:31.923247007 +0800
+@@ -190,8 +190,6 @@
+ #pragma pack(pop)
+ typedef struct IORPCMessage IORPCMessage;
+ 
+-#ifndef KERNEL
+-
+ #if defined(__cplusplus)
+ extern "C"
+ #else
+@@ -199,8 +197,6 @@
+ #endif
+ IORPCMessage *
+ IORPCMessageFromMach(IORPCMessageMach * msg, bool reply);
+-
+-#endif /* KERNEL */
+ 
+ struct IORPCMessageErrorReturnContent {
+ 	IORPCMessage  hdr;

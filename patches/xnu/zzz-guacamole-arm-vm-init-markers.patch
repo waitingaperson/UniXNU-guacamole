@@ -1,6 +1,6 @@
 diff -r C6/bsd/dev/sweet_ufs.c B6/bsd/dev/sweet_ufs.c
 --- C6/bsd/dev/sweet_ufs.c	2026-10-23 23:33:18.129229798 +0800
-+++ B6/bsd/dev/sweet_ufs.c	2026-10-24 09:30:02.742090217 +0800
++++ B6/bsd/dev/sweet_ufs.c	2026-10-24 10:31:31.641722057 +0800
 @@ -65,9 +65,9 @@
  #define CAP_64AS        (1u << 24)              /* 64-bit DMA addressing */
  
@@ -13,7 +13,15 @@ diff -r C6/bsd/dev/sweet_ufs.c B6/bsd/dev/sweet_ufs.c
  #define CMD_TIMEOUT_NS  (5ull * NSEC_PER_SEC)
  #define CMD_SPIN_NS     (50ull * NSEC_PER_USEC)
  #define CMD_SLEEP_NS    (200ull * NSEC_PER_USEC)
-@@ -127,13 +127,13 @@
+@@ -97,6 +97,7 @@
+ 	vm_offset_t regs;
+ 	vm_offset_t dma;                        /* kernel VA of the DMA allocation */
+ 	uint64_t dma_pa;
++	boolean_t dma_ready;
+ 	uint8_t lun;
+ 	uint8_t tag;
+ 	uint64_t first_block, nblocks;          /* partition, in 4 KiB device blocks */
+@@ -127,13 +128,13 @@
  static void
  dma_sync(uint32_t off, uint32_t len)
  {
@@ -29,7 +37,7 @@ diff -r C6/bsd/dev/sweet_ufs.c B6/bsd/dev/sweet_ufs.c
  }
  
  /*
-@@ -199,7 +199,19 @@
+@@ -199,7 +200,19 @@
  	}
  	__builtin_arm_dsb(0xf);
  
@@ -49,7 +57,7 @@ diff -r C6/bsd/dev/sweet_ufs.c B6/bsd/dev/sweet_ufs.c
  	uint64_t deadline;
  	nanoseconds_to_absolutetime(CMD_TIMEOUT_NS, &deadline);
  	deadline += mach_absolute_time();
-@@ -211,9 +223,20 @@
+@@ -211,9 +224,20 @@
  		spin_until += mach_absolute_time();
  		nanoseconds_to_absolutetime(CMD_SLEEP_NS, &sleep_interval);
  	}
@@ -70,7 +78,35 @@ diff -r C6/bsd/dev/sweet_ufs.c B6/bsd/dev/sweet_ufs.c
  			ufs_wr(REG_UTRLCLR, ~1u);
  			printf("SWEET UFS: command 0x%02x timed out\n", cdb[0]);
  			return ETIMEDOUT;
-@@ -582,6 +605,8 @@
+@@ -579,9 +603,36 @@
+ };
+ 
+ static int
++void
++sweet_ufs_early_alloc(void)
++{
++	ppnum_t pn;
++
++	if (su.dma_ready) {
++		return;
++	}
++	if (kmem_alloc_contig(kernel_map, &su.dma, DMA_SIZE, PAGE_MASK, 0xFFFFF, 0,
++	    KMA_DATA | KMA_ZERO | KMA_PERMANENT, VM_KERN_MEMORY_IOKIT) != KERN_SUCCESS) {
++		printf("SWEET UFS: early DMA allocation failed\n");
++		return;
++	}
++	pn = pmap_find_phys(kernel_pmap, (addr64_t)su.dma);
++	if (!pn) {
++		printf("SWEET UFS: early DMA has no physical page\n");
++		return;
++	}
++	su.dma_pa = ptoa_64(pn);
++	su.dma_ready = true;
++	printf("SWEET UFS: early DMA pa=0x%llx size=%u\n",
++	    (unsigned long long)su.dma_pa, (unsigned)DMA_SIZE);
++}
++
++int
  sweet_ufs_init(void)
  {
  	DTEntry node;
@@ -79,7 +115,7 @@ diff -r C6/bsd/dev/sweet_ufs.c B6/bsd/dev/sweet_ufs.c
  	uintptr_t const *reg = NULL;
  	unsigned int size = 0;
  	char want[64] = "userdata";
-@@ -593,6 +618,7 @@
+@@ -593,6 +644,7 @@
  		printf("SWEET UFS: no /sweet-ufs node in the device tree\n");
  		return ENXIO;
  	}
@@ -87,7 +123,7 @@ diff -r C6/bsd/dev/sweet_ufs.c B6/bsd/dev/sweet_ufs.c
  	PE_parse_boot_argn("ufsroot", want, sizeof(want));
  	uint32_t rw = 0;
  	PE_parse_boot_argn("ufsrw", &rw, sizeof(rw));
-@@ -603,7 +629,12 @@
+@@ -603,7 +655,12 @@
  	su.wait = (wait == 1);
  
  	su.regs = ml_io_map(reg[0], reg[1]);
@@ -101,7 +137,7 @@ diff -r C6/bsd/dev/sweet_ufs.c B6/bsd/dev/sweet_ufs.c
  	    KMA_DATA | KMA_ZERO | KMA_PERMANENT, VM_KERN_MEMORY_IOKIT) != KERN_SUCCESS) {
  		printf("SWEET UFS: no contiguous DMA memory\n");
  		return ENOMEM;
-@@ -613,20 +644,25 @@
+@@ -613,20 +670,25 @@
  		return ENOMEM;
  	}
  	su.dma_pa = ptoa_64(pn);
@@ -127,7 +163,7 @@ diff -r C6/bsd/dev/sweet_ufs.c B6/bsd/dev/sweet_ufs.c
  	lck_mtx_unlock(&sweet_ufs_lock);
  	if (error) {
  		return error;
-@@ -640,6 +676,7 @@
+@@ -640,6 +702,7 @@
  	if (su.cmajor < 0) {
  		return ENXIO;
  	}
@@ -137,7 +173,7 @@ diff -r C6/bsd/dev/sweet_ufs.c B6/bsd/dev/sweet_ufs.c
  	devfs_make_node(makedev(su.cmajor, 0), DEVFS_CHAR, UID_ROOT, GID_OPERATOR, 0640, "rufsroot0");
 diff -r C6/bsd/kern/bsd_init.c B6/bsd/kern/bsd_init.c
 --- C6/bsd/kern/bsd_init.c	2026-10-23 23:17:10.490635342 +0800
-+++ B6/bsd/kern/bsd_init.c	2026-10-24 00:52:38.565175294 +0800
++++ B6/bsd/kern/bsd_init.c	2026-10-24 10:31:31.641888458 +0800
 @@ -486,11 +486,19 @@
  	boolean_t       netboot = FALSE;
  #endif
@@ -159,9 +195,14 @@ diff -r C6/bsd/kern/bsd_init.c B6/bsd/kern/bsd_init.c
  
  #if DEBUG_BSDINIT
  #define bsd_init_kprintf(x, ...) kprintf("bsd_init: " x, ## __VA_ARGS__)
-@@ -499,17 +507,21 @@
+@@ -498,18 +506,26 @@
+ #define bsd_init_kprintf(x, ...)
  #endif
  
++	{
++		extern void sweet_ufs_early_alloc(void);
++		sweet_ufs_early_alloc();
++	}
  	throttle_init();
 +	{ extern void sweet_stage_mark(boot_args *args, unsigned int stage); sweet_stage_mark(NULL, 143); }
  
@@ -181,7 +222,7 @@ diff -r C6/bsd/kern/bsd_init.c B6/bsd/kern/bsd_init.c
  
  	/* kernel_task->proc = kernproc; */
  	set_bsdtask_info(kernel_task, (void *)kernproc);
-@@ -568,6 +580,7 @@
+@@ -568,6 +584,7 @@
  	 * Initialize the MAC Framework
  	 */
  	mac_policy_initbsd();
@@ -189,7 +230,7 @@ diff -r C6/bsd/kern/bsd_init.c B6/bsd/kern/bsd_init.c
  
  #if defined (__i386__) || defined (__x86_64__)
  	/*
-@@ -680,30 +693,36 @@
+@@ -680,30 +697,36 @@
  	 */
  	bsd_init_kprintf("calling bsd_bufferinit\n");
  	bsd_bufferinit();
@@ -226,7 +267,7 @@ diff -r C6/bsd/kern/bsd_init.c B6/bsd/kern/bsd_init.c
  	restricted_in_port_init();
  #endif /* SOCKETS */
  
-@@ -719,21 +738,26 @@
+@@ -719,21 +742,26 @@
  	/* Initialize kqueues */
  	bsd_init_kprintf("calling knote_init\n");
  	knote_init();
@@ -253,7 +294,7 @@ diff -r C6/bsd/kern/bsd_init.c B6/bsd/kern/bsd_init.c
  
  	/*
  	 * Initialize protocols.  Block reception of incoming packets
-@@ -744,12 +768,14 @@
+@@ -744,12 +772,14 @@
  	nwk_wq_init();
  	bsd_init_kprintf("calling dlil_init\n");
  	dlil_init();
@@ -268,7 +309,7 @@ diff -r C6/bsd/kern/bsd_init.c B6/bsd/kern/bsd_init.c
  	iptap_init();
  #if FLOW_DIVERT
  	flow_divert_init();
-@@ -784,9 +810,11 @@
+@@ -784,9 +814,11 @@
  
  	bsd_init_kprintf("calling sysctl_mib_init\n");
  	sysctl_mib_init();
@@ -280,7 +321,7 @@ diff -r C6/bsd/kern/bsd_init.c B6/bsd/kern/bsd_init.c
  
  #if CONFIG_DTRACE
  	dtrace_postinit();
-@@ -805,18 +833,23 @@
+@@ -805,18 +837,23 @@
  #if NGIF
  	/* Initialize gif interface (after lo0) */
  	gif_init();
@@ -304,7 +345,7 @@ diff -r C6/bsd/kern/bsd_init.c B6/bsd/kern/bsd_init.c
  
  #if NETWORKING
  #if CONTENT_FILTER
-@@ -852,9 +885,13 @@
+@@ -852,9 +889,13 @@
  	bsd_init_kprintf("calling net_init_run\n");
  	net_init_run();
  #endif /* NETWORKING */
@@ -318,7 +359,7 @@ diff -r C6/bsd/kern/bsd_init.c B6/bsd/kern/bsd_init.c
  
  	/* Mount the root file system. */
  	while (TRUE) {
-@@ -862,12 +899,14 @@
+@@ -862,12 +903,14 @@
  
  		bsd_init_kprintf("calling setconf\n");
  		setconf();

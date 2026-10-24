@@ -1,5 +1,5 @@
 diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
-index 8fe43b6..8c6dd0c 100644
+index 5b8d8ff..b0732f5 100644
 --- a/osfmk/arm/arm_init.c
 +++ b/osfmk/arm/arm_init.c
 @@ -353,6 +353,13 @@ arm_init(
@@ -16,20 +16,18 @@ index 8fe43b6..8c6dd0c 100644
  	arm_setup_pre_sign();
  
  	arm_slide_rebase_and_sign_image();
-diff --git a/b/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
+diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 new file mode 100644
-index 0000000..49a9260
+index 0000000..5ce7b26
 --- /dev/null
 +++ b/osfmk/arm64/sweet_stage.c
-@@ -0,0 +1,179 @@
+@@ -0,0 +1,97 @@
 +/*
-+ * Guacamole bring-up markers. The bootstrap page tables map the first 2 MiB
-+ * of the boot framebuffer V=P, so these writes work from C with the MMU on
-+ * and without any IOKit driver. Stages are 128x4 blocks at
-+ * y=40+(stage&7)*20, one column per group: 0-11 x=300, 12-15 x=500,
-+ * 16-19 x=700, 20-23 x=900, 24-27 x=1100. Stages 28+ use a second band at
-+ * y=220+(stage&7)*20, x=300 for 28-35. Stage 7 is immediately before
-+ * arm_vm_init tears down the bootstrap TTBR0.
++ * Guacamole bring-up markers. DarwinBoot leaves the boot framebuffer mapped
++ * V=P in the bootstrap tables (see the start.s patch), so these writes work
++ * from C with the MMU on and without any IOKit driver. Each mark draws its
++ * stage number as large white digits at the top left; the last number still
++ * visible is the last stage that ran.
 + */
 +#include <pexpert/pexpert.h>
 +#include <pexpert/arm64/boot.h>
@@ -43,8 +41,7 @@ index 0000000..49a9260
 +	sweet_stage_args = args;
 +}
 +
-+
-+/* 5x7 digits, drawn at 10x so the last stage is readable in a photo. */
++/* 5x7 digits, drawn at 16x so the last stage is readable in a photo. */
 +static const uint8_t sweet_digits[10][7] = {
 +	{ 0x0e, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0e },
 +	{ 0x04, 0x0c, 0x04, 0x04, 0x04, 0x04, 0x0e },
@@ -63,7 +60,7 @@ index 0000000..49a9260
 +{
 +	uint64_t base = args->Video.v_baseAddr;
 +	uint32_t stride = (uint32_t)args->Video.v_rowBytes;
-+	const uint32_t scale = 10;
++	const uint32_t scale = 16;
 +	const uint32_t ox = 16, oy = 16;
 +	uint32_t digits[3];
 +	unsigned int n = 0, v = stage;
@@ -73,6 +70,7 @@ index 0000000..49a9260
 +	}
 +	volatile uint32_t *fb = (volatile uint32_t *)(uintptr_t)base;
 +
++	/* Clear the three-digit cell so the previous stage does not show. */
 +	for (uint32_t y = 0; y < 8 * scale; y++) {
 +		volatile uint32_t *line = fb + (uint64_t)(oy + y) * (stride / 4u);
 +		for (uint32_t x = 0; x < 3 * 6 * scale; x++) {
@@ -115,88 +113,8 @@ index 0000000..49a9260
 +	if (args == NULL) {
 +		args = sweet_stage_args;
 +	}
-+	static const uint32_t colors[160] = {
-+		0xffff00ffu, 0xffffff00u, 0xff0000ffu, 0xffffff00u,
-+		0xff00ffffu, 0xffff00ffu, 0xff808080u, 0xffffffffu,
-+		0xff00ffffu, 0xff0080ffu, 0xff8000ffu, 0xff00ff80u,
-+		0xffff0080u, 0xff80ff00u, 0xff4080c0u, 0xffc08040u,
-+		0xff20c0ffu, 0xffff8040u, 0xffc020ffu, 0xff80c020u,
-+		0xff00ff40u, 0xffff40ffu, 0xff40ffffu, 0xffffff80u,
-+		0xffff0000u, 0xffff8000u, 0xffffff40u, 0xffff00ffu,
-+		0xff00ff80u, 0xff8000ffu, 0xffff0080u, 0xff80ff80u,
-+		0xff8080ffu, 0xffff8080u, 0xff80ffffu, 0xffffff80u,
-+		0xff20ff80u, 0xffff2080u, 0xff80ff20u, 0xff2080ffu,
-+		0xffff8020u, 0xff20ffffu, 0xffff20ffu, 0xff80ffffu,
-+		0xff40ff80u, 0xffff4080u, 0xff80ff40u, 0xff4080ffu,
-+		0xffffc040u, 0xff40c0ffu, 0xffc0ff40u, 0xffff40c0u,
-+		0xff40ffc0u, 0xffc040ffu, 0xffffc0c0u, 0xffc0c0ffu,
-+		0xff80c0ffu, 0xffffc080u, 0xffc0ff80u, 0xffff80c0u,
-+		0xff80ffc0u, 0xffc080ffu, 0xffffc0ffu, 0xffc0ffffu,
-+		0xff60ff60u, 0xffff6060u, 0xff6060ffu, 0xffffff60u,
-+		0xff60ffffu, 0xffff60ffu, 0xffa0a0a0u, 0xffffffffu,
-+		0xff202020u, 0xffff8000u, 0xff0080ffu, 0xff80ff00u,
-+		0xffff0080u, 0xff00ff80u, 0xff8000ffu, 0xff00ffffu,
-+		0xffff4040u, 0xff40ff40u, 0xff4040ffu, 0xffffff40u,
-+		0xff40ffffu, 0xffff40ffu, 0xffc0c0c0u, 0xff808080u,
-+		0xff202060u, 0xffff6020u, 0xff2060ffu, 0xff60ff20u,
-+		0xffff2060u, 0xff20ff60u, 0xff6020ffu, 0xffff2060u,
-+		0xffa02020u, 0xff20a020u, 0xff2020a0u, 0xffa0a020u,
-+		0xff20a0a0u, 0xffa020a0u, 0xffe0e0e0u, 0xff606060u,
-+		0xffc04040u, 0xff40c040u, 0xff4040c0u, 0xffc0c040u,
-+		0xff40c0c0u, 0xffc040c0u, 0xffffe0e0u, 0xff404040u,
-+		0xffffff00u, 0xff00ffffu, 0xffff00ffu, 0xff00ff00u,
-+		0xffff0000u, 0xff0000ffu, 0xff808080u, 0xffc0c0c0u,
-+		0xff800000u, 0xff008000u, 0xff000080u, 0xff808000u,
-+		0xff008080u, 0xff800080u, 0xff404040u, 0xffffffffu,
-+		0xff400000u, 0xff004000u, 0xff000040u, 0xff404000u,
-+		0xff004040u, 0xff400040u, 0xff202020u, 0xffe0e0e0u,
-+		0xffc00000u, 0xff00c000u, 0xff0000c0u, 0xffc0c000u,
-+		0xff00c0c0u, 0xffc000c0u, 0xff808000u, 0xff008080u,
-+		0xffff8080u, 0xff80ff80u, 0xff8080ffu, 0xffffff80u,
-+		0xff80ffffu, 0xffff80ffu, 0xffc0c0c0u, 0xff606060u,
-+		0xffff0000u, 0xff00ff00u, 0xff0000ffu, 0xffffff00u,
-+		0xff00ffffu, 0xffff00ffu, 0xff9f9f9fu, 0xff5f5f5fu
-+	};
-+
 +	if (args == NULL || stage > 999) {
 +		return;
-+	}
-+	uint64_t base = args->Video.v_baseAddr;
-+	uint32_t stride = (uint32_t)args->Video.v_rowBytes;
-+	if (base == 0 || stride < 4) {
-+		return;
-+	}
-+	volatile uint32_t *fb = (volatile uint32_t *)(uintptr_t)base;
-+	/* Extended stages only need the number; the 160-entry color table and
-+	 * the block band stop at 159. */
-+	if (stage > 159) {
-+		sweet_stage_number(args, stage);
-+		__asm__ volatile ("dsb sy" ::: "memory");
-+		return;
-+	}
-+	if (stage == 0) {
-+		for (uint32_t row = 0; row < 144; row++) {
-+			volatile uint32_t *line = fb + (uint64_t)(40u + row) * (stride / 4u);
-+			for (uint32_t col = 300; col < 1100; col++) {
-+				line[col] = 0;
-+			}
-+		}
-+		__asm__ volatile ("dsb sy" ::: "memory");
-+	}
-+	/* Keep every marker below 2 MiB: the bootstrap maps only the first
-+	 * 2 MiB of the framebuffer V=P, so y=380 would fault. */
-+	uint32_t y = stage < 28u ? 40u + (stage & 7u) * 20u :
-+	    (stage < 128u ? 220u + ((stage - 28u) & 7u) * 20u :
-+	    220u + ((stage - 128u) & 7u) * 20u);
-+	uint32_t x = stage < 12u ? 300u : (stage < 16u ? 500u :
-+	    (stage < 20u ? 700u : (stage < 24u ? 900u :
-+	    (stage < 28u ? 1100u : (stage < 128u ?
-+	    300u + ((stage < 80u ? stage - 28u : stage - 80u) / 8u) * 200u : 300u)))));
-+	for (uint32_t row = 0; row < 4; row++) {
-+		volatile uint32_t *line = fb + (uint64_t)(y + row) * (stride / 4u);
-+		for (uint32_t col = x; col < x + 128u; col++) {
-+			line[col] = colors[stage];
-+		}
 +	}
 +	sweet_stage_number(args, stage);
 +	__asm__ volatile ("dsb sy" ::: "memory");

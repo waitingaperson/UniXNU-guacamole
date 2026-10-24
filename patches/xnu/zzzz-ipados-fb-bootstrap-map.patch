@@ -1,7 +1,7 @@
-Only in xb: .git
-diff -r xb/osfmk/arm/arm_init.c xc/osfmk/arm/arm_init.c
---- a/osfmk/arm/arm_init.c	2026-10-24 18:40:06.894043789 +0800
-+++ b/osfmk/arm/arm_init.c	2026-10-24 18:40:40.046446199 +0800
+diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
+index c61727c..f16b62a 100644
+--- a/osfmk/arm/arm_init.c
++++ b/osfmk/arm/arm_init.c
 @@ -79,6 +79,8 @@
  
  #include <console/serial_protos.h>
@@ -11,7 +11,7 @@ diff -r xb/osfmk/arm/arm_init.c xc/osfmk/arm/arm_init.c
  #if CONFIG_TELEMETRY
  #include <kern/telemetry.h>
  #endif
-@@ -540,6 +542,8 @@
+@@ -540,6 +542,8 @@ arm_init(
  
  	boot_progress_stage("arm_vm_init enter");
  	arm_vm_init(xmaxmem, args);
@@ -20,7 +20,7 @@ diff -r xb/osfmk/arm/arm_init.c xc/osfmk/arm/arm_init.c
  	boot_progress_stage("arm_vm_init returned");
  
  	if (debug_boot_arg) {
-@@ -595,6 +599,8 @@
+@@ -595,6 +599,8 @@ arm_init(
  		(void)switch_to_serial_console(); /* Switch into serial mode from video console */
  		disableConsoleOutput = FALSE;     /* Allow printfs to happen */
  	}
@@ -29,7 +29,7 @@ diff -r xb/osfmk/arm/arm_init.c xc/osfmk/arm/arm_init.c
  	PE_create_console();
  	/*
  	 * The screen acquire below runs in graphics mode, which disables the
-@@ -606,6 +612,8 @@
+@@ -606,16 +612,24 @@ arm_init(
  	/* setup console output */
  	PE_init_printf(FALSE);
  
@@ -38,10 +38,45 @@ diff -r xb/osfmk/arm/arm_init.c xc/osfmk/arm/arm_init.c
  #if __arm64__
  #if DEBUG
  	dump_kva_space();
-diff -r xb/osfmk/arm64/arm_vm_init.c xc/osfmk/arm64/arm_vm_init.c
---- a/osfmk/arm64/arm_vm_init.c	2026-10-24 18:40:06.766190041 +0800
-+++ b/osfmk/arm64/arm_vm_init.c	2026-10-24 18:40:40.046102544 +0800
-@@ -1814,7 +1814,43 @@
+ #endif
+ #endif
+ 
++	sweet_stage_mark(args, 53);
++
+ 	cpu_machine_idle_init(TRUE);
+ 
++	sweet_stage_mark(args, 54);
++
+ 	PE_init_platform(TRUE, &BootCpuData);
+ 
++	sweet_stage_mark(args, 55);
++
+ #if __arm64__
+ 	extern bool cpu_config_correct;
+ 	if (!cpu_config_correct) {
+@@ -640,6 +654,8 @@ arm_init(
+ 	PE_init_cpu();
+ 	fiq_context_init(TRUE);
+ 
++	sweet_stage_mark(args, 56);
++
+ 
+ #if HIBERNATION
+ 	pal_hib_init();
+@@ -668,6 +684,8 @@ arm_init(
+ 	gDramBase = *dram_base;
+ 	gDramSize = *dram_size;
+ 
++	sweet_stage_mark(args, 57);
++
+ 	/*
+ 	 * Initialize the stack protector for all future calls
+ 	 * to C code. Since kernel_bootstrap() eventually
+diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
+index a688021..0dfe8ae 100644
+--- a/osfmk/arm64/arm_vm_init.c
++++ b/osfmk/arm64/arm_vm_init.c
+@@ -1814,7 +1814,43 @@ init_ptpages(tt_entry_t *tt, vm_map_address_t start, vm_map_address_t end, bool
  	}
  }
  
@@ -85,7 +120,7 @@ diff -r xb/osfmk/arm64/arm_vm_init.c xc/osfmk/arm64/arm_vm_init.c
  #define ARM64_PHYSMAP_SLIDE_MASK  (ARM64_PHYSMAP_SLIDE_RANGE - 1)
  
  void
-@@ -1830,11 +1866,15 @@
+@@ -1830,11 +1866,15 @@ arm_vm_init(uint64_t memory_size, boot_args * args)
  	vm_offset_t      ptpage_vaddr;
  	vm_map_address_t dynamic_memory_begin;
  
@@ -101,7 +136,7 @@ diff -r xb/osfmk/arm64/arm_vm_init.c xc/osfmk/arm64/arm_vm_init.c
  #if KASAN
  	real_phys_size = args->memSize + (shadow_ptop - shadow_pbase);
  #else
-@@ -1918,6 +1958,8 @@
+@@ -1918,6 +1958,8 @@ arm_vm_init(uint64_t memory_size, boot_args * args)
  		panic("Unsupported memory configuration %lx", mem_size);
  	}
  
@@ -110,7 +145,7 @@ diff -r xb/osfmk/arm64/arm_vm_init.c xc/osfmk/arm64/arm_vm_init.c
  	boot_tte = (tt_entry_t *)&bootstrap_pagetables;
  	boot_ttep = kvtophys((vm_offset_t)boot_tte);
  
-@@ -2134,6 +2176,9 @@
+@@ -2134,6 +2176,9 @@ arm_vm_init(uint64_t memory_size, boot_args * args)
  	init_ptpages(cpu_tte, dynamic_memory_begin, VM_MAX_KERNEL_ADDRESS, TRUE, ARM_DYNAMIC_TABLE_XN | ARM_TTE_TABLE_AP(ARM_TTE_TABLE_AP_USER_NA));
  #endif
  
@@ -120,7 +155,7 @@ diff -r xb/osfmk/arm64/arm_vm_init.c xc/osfmk/arm64/arm_vm_init.c
  #if KASAN
  	/* record the extent of the physmap */
  	physmap_vbase = physmap_base;
-@@ -2147,21 +2192,38 @@
+@@ -2147,21 +2192,38 @@ arm_vm_init(uint64_t memory_size, boot_args * args)
  
  	arm_set_user_tbi();
  
@@ -160,7 +195,7 @@ diff -r xb/osfmk/arm64/arm_vm_init.c xc/osfmk/arm64/arm_vm_init.c
  	// From here on out, we're off the bootstrap translation tables.
  
  
-@@ -2255,6 +2317,8 @@
+@@ -2255,6 +2317,8 @@ arm_vm_init(uint64_t memory_size, boot_args * args)
  #endif
  	pmap_bootstrap(dynamic_memory_begin);
  
@@ -169,10 +204,11 @@ diff -r xb/osfmk/arm64/arm_vm_init.c xc/osfmk/arm64/arm_vm_init.c
  	disable_preemption();
  
  	/*
-diff -r xb/osfmk/arm64/start.s xc/osfmk/arm64/start.s
---- a/osfmk/arm64/start.s	2026-10-24 18:40:06.746017901 +0800
-+++ b/osfmk/arm64/start.s	2026-10-24 18:40:40.044431952 +0800
-@@ -626,6 +626,46 @@
+diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
+index bca4c7c..9a5f645 100644
+--- a/osfmk/arm64/start.s
++++ b/osfmk/arm64/start.s
+@@ -626,6 +626,46 @@ Lbootstrap_tables_ready:
  	/* Ensure TTEs are visible */
  	dsb		ish
  

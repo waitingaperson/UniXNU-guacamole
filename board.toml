@@ -140,6 +140,7 @@ kernel_args = [
   "sweetfb_hz=30",
   "sweetgpu=3",
   "sweetlogdump=1",
+  "guac_skip_lockdown=1",
 ]
 
 [payload.adt]

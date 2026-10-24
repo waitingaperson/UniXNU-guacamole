@@ -1,0 +1,221 @@
+Only in xb: .git
+diff -r xb/osfmk/arm/arm_init.c xc/osfmk/arm/arm_init.c
+--- a/osfmk/arm/arm_init.c	2026-10-24 18:40:06.894043789 +0800
++++ b/osfmk/arm/arm_init.c	2026-10-24 18:40:40.046446199 +0800
+@@ -79,6 +79,8 @@
+ 
+ #include <console/serial_protos.h>
+ 
++extern void sweet_stage_mark(boot_args *args, unsigned int stage);
++
+ #if CONFIG_TELEMETRY
+ #include <kern/telemetry.h>
+ #endif
+@@ -540,6 +542,8 @@
+ 
+ 	boot_progress_stage("arm_vm_init enter");
+ 	arm_vm_init(xmaxmem, args);
++
++	sweet_stage_mark(args, 50);
+ 	boot_progress_stage("arm_vm_init returned");
+ 
+ 	if (debug_boot_arg) {
+@@ -595,6 +599,8 @@
+ 		(void)switch_to_serial_console(); /* Switch into serial mode from video console */
+ 		disableConsoleOutput = FALSE;     /* Allow printfs to happen */
+ 	}
++	sweet_stage_mark(args, 51);
++
+ 	PE_create_console();
+ 	/*
+ 	 * The screen acquire below runs in graphics mode, which disables the
+@@ -606,6 +612,8 @@
+ 	/* setup console output */
+ 	PE_init_printf(FALSE);
+ 
++	sweet_stage_mark(args, 52);
++
+ #if __arm64__
+ #if DEBUG
+ 	dump_kva_space();
+diff -r xb/osfmk/arm64/arm_vm_init.c xc/osfmk/arm64/arm_vm_init.c
+--- a/osfmk/arm64/arm_vm_init.c	2026-10-24 18:40:06.766190041 +0800
++++ b/osfmk/arm64/arm_vm_init.c	2026-10-24 18:40:40.046102544 +0800
+@@ -1814,7 +1814,43 @@
+ 	}
+ }
+ 
++/*
++ * Guacamole: io_map() runs before kmem is available and maps the panic log,
++ * the framebuffer and the UART with pmap_map_bd_with_options(), which walks
++ * the leaf tables without allocating them. Pre-allocate the L3 tables for the
++ * early I/O window that starts at virtual_space_start.
++ */
++#define EARLY_IO_WINDOW_SIZE (64ULL * 1024 * 1024)
++
++static void
++init_ptpages_leaf(tt_entry_t *tt, vm_map_address_t start, vm_map_address_t end)
++{
++	vm_offset_t ptpage_vaddr;
++	tt_entry_t *l1_tte;
++	tt_entry_t *l2_tte;
++	vm_map_address_t va;
++
++	for (va = start; va < end; va += ARM_TT_L2_SIZE) {
++		l1_tte = tt + L1_TABLE_INDEX(va);
++		if ((*l1_tte & (ARM_TTE_VALID | ARM_TTE_TYPE_MASK)) !=
++		    (ARM_TTE_VALID | ARM_TTE_TYPE_TABLE)) {
++			continue;
++		}
++		l2_tte = (tt_entry_t *)((*l1_tte & ARM_TTE_TABLE_MASK) -
++		    gPhysBase + gVirtBase) + L2_TABLE_INDEX(va);
++		if (*l2_tte != ARM_TTE_EMPTY) {
++			continue;
++		}
++		ptpage_vaddr = alloc_ptpage(TRUE);
++		*l2_tte = (kvtophys(ptpage_vaddr) & ARM_TTE_TABLE_MASK) |
++		    ARM_TTE_TYPE_TABLE | ARM_TTE_VALID;
++		bzero((void *)ptpage_vaddr, ARM_PGBYTES);
++	}
++}
++
+ #define ARM64_PHYSMAP_SLIDE_RANGE (1ULL << 30) // 1 GB
++
++extern void sweet_stage_mark(boot_args *args, unsigned int stage);
+ #define ARM64_PHYSMAP_SLIDE_MASK  (ARM64_PHYSMAP_SLIDE_RANGE - 1)
+ 
+ void
+@@ -1830,11 +1866,15 @@
+ 	vm_offset_t      ptpage_vaddr;
+ 	vm_map_address_t dynamic_memory_begin;
+ 
++	sweet_stage_mark(args, 12);
++
+ 	/*
+ 	 * Get the virtual and physical kernel-managed memory base from boot_args.
+ 	 */
+ 	gVirtBase = args->virtBase;
+ 	gPhysBase = args->physBase;
++
++	sweet_stage_mark(args, 17);
+ #if KASAN
+ 	real_phys_size = args->memSize + (shadow_ptop - shadow_pbase);
+ #else
+@@ -1918,6 +1958,8 @@
+ 		panic("Unsupported memory configuration %lx", mem_size);
+ 	}
+ 
++	sweet_stage_mark(args, 18);
++
+ 	boot_tte = (tt_entry_t *)&bootstrap_pagetables;
+ 	boot_ttep = kvtophys((vm_offset_t)boot_tte);
+ 
+@@ -2134,6 +2176,9 @@
+ 	init_ptpages(cpu_tte, dynamic_memory_begin, VM_MAX_KERNEL_ADDRESS, TRUE, ARM_DYNAMIC_TABLE_XN | ARM_TTE_TABLE_AP(ARM_TTE_TABLE_AP_USER_NA));
+ #endif
+ 
++	init_ptpages_leaf(cpu_tte, dynamic_memory_begin,
++	    dynamic_memory_begin + EARLY_IO_WINDOW_SIZE);
++
+ #if KASAN
+ 	/* record the extent of the physmap */
+ 	physmap_vbase = physmap_base;
+@@ -2147,21 +2192,38 @@
+ 
+ 	arm_set_user_tbi();
+ 
++	sweet_stage_mark(args, 19);
++
+ 	arm_vm_physmap_init(args);
++
++	sweet_stage_mark(args, 20);
++
+ 	set_mmu_ttb_alternate(cpu_ttep & TTBR_BADDR_MASK);
+ 
+ #if XNU_MONITOR
+ 	ml_enable_monitor();
+ #endif
+ 
+-	set_mmu_ttb(invalid_ttep & TTBR_BADDR_MASK);
++	sweet_stage_mark(args, 21);
++
++	/*
++	 * Guacamole debug: keep the bootstrap TTBR0 root (which has the
++	 * framebuffer V=P entry) instead of the empty invalid table, so the
++	 * stage markers and the early console can reach the framebuffer.
++	 */
++	set_mmu_ttb(boot_ttep & TTBR_BADDR_MASK);
+ 
+ 	flush_mmu_tlb();
++
++	sweet_stage_mark(args, 22);
++
+ 	kva_active = TRUE;
+ 	// global table pointers may need to be different due to physical aperture remapping
+ 	cpu_tte = (tt_entry_t*)(phystokv(cpu_ttep));
+ 	invalid_tte = (tt_entry_t*)(phystokv(invalid_ttep));
+ 
++	sweet_stage_mark(args, 13);
++
+ 	// From here on out, we're off the bootstrap translation tables.
+ 
+ 
+@@ -2255,6 +2317,8 @@
+ #endif
+ 	pmap_bootstrap(dynamic_memory_begin);
+ 
++	sweet_stage_mark(args, 14);
++
+ 	disable_preemption();
+ 
+ 	/*
+diff -r xb/osfmk/arm64/start.s xc/osfmk/arm64/start.s
+--- a/osfmk/arm64/start.s	2026-10-24 18:40:06.746017901 +0800
++++ b/osfmk/arm64/start.s	2026-10-24 18:40:40.044431952 +0800
+@@ -626,6 +626,46 @@
+ 	/* Ensure TTEs are visible */
+ 	dsb		ish
+ 
++	/*
++	 * Guacamole: map the first 2 MiB of the boot framebuffer V=P so the
++	 * stage markers can be written with the MMU on. DarwinBoot leaves no
++	 * framebuffer mapping behind; without this the first marker faults as
++	 * soon as translation is enabled.
++	 */
++	ldr		x6, [x20, #0x28]			// Video.v_baseAddr
++	cbz		x6, 5f
++	MOV64	x9, ~0x1fffff
++	and		x6, x6, x9
++	ubfx	x7, x6, #30, #2				// L1 index
++	ldr		x8, [x25, x7, lsl #3]
++	and		x9, x8, #3
++	cmp		x9, #3					// existing L2 table?
++	b.eq	3f
++	tst		x8, #1					// existing block mapping?
++	b.ne	5f
++	/* Take one page from the bootstrap pool for a zeroed L2 table. */
++	add		x10, x25, #(BOOTSTRAP_TABLE_BYTES >> 12), lsl #12
++	cmp		x2, x10
++	b.hs	5f
++	mov		x8, x2
++	add		x2, x2, #0x1000
++	mov		x10, x8
++	mov		x11, #512
++2:
++	str		xzr, [x10], #8
++	subs	x11, x11, #1
++	b.ne	2b
++	mov		x10, #(ARM_TTE_TYPE_TABLE | ARM_TTE_VALID)
++	orr		x8, x8, x10
++	str		x8, [x25, x7, lsl #3]
++3:
++	and		x8, x8, #(ARM_TTE_TABLE_MASK)
++	ubfx	x9, x6, #21, #9				// 2 MiB L2 index
++	MOV64	x10, (ARM_TTE_TYPE_BLOCK | ARM_TTE_VALID | ARM_TTE_BLOCK_SH(SH_OUTER_MEMORY) | ARM_TTE_BLOCK_ATTRINDX(CACHE_ATTRINDX_WRITECOMB) | ARM_TTE_BLOCK_AF | ARM_TTE_BLOCK_PNX | ARM_TTE_BLOCK_NX)
++	orr		x10, x10, x6
++	str		x10, [x8, x9, lsl #3]
++	dsb		ish
++5:
+ 
+ 	b		common_start
+ 

@@ -520,6 +520,29 @@
   RamPartitionDxe, SimpleFbDxe, BdsDxe. `DisplayDxe` is commented out.
 - No partition was written; every test used `fastboot boot`.
 
+
+## 2026-10-24: r15 chain re-verified, from-source status
+
+- **The r15 chain boots to iOS again.** `boot-32-r15-retest.img` (ios-sweet
+  `kernel.development.guacamole`, sha256 `f9080dac...`, with the generated
+  guacamole ADT, the r15 kernel arguments and the NOSB firmware volume)
+  reaches the iOS userland on hardware. This confirms the UEFI/DarwinBoot,
+  the UFS root and HFS/AMFI on the phone are all intact.
+- **The from-source 8796 kernel does not reach userspace yet.**
+  - `mbinit`, dlil and `ifnet_attach` pass; `setconf` stops in the UFS DMA
+    allocation (fixed by a `max_pnum < 4 GiB` early allocation in r90).
+  - The prelink route is ruled out for this kernel: the ipados notes record
+    `NativePrelink.plan` failing on `_vfs_getvfs_with_vfsops` and the missing
+    `_kalloc_sparse_prelink_index_version` / `_native_prelink_security_init_version`
+    exports ("Do not force the prelink"). Prelinking Apple kexts also pulls
+    AMFI/AppleImage4 in, which panics on the absent mix-n-match policy.
+  - The working ios-sweet kernel is monolithic (`SWEET HFS`, `SWEET AMFI`)
+    and mounts the root as HFS on `/dev/ufsroot0`.
+- Next for the from-source track: port the ios-sweet built-in patch set
+  (0025 AMFI, 0026 HFS, 0015 trust cache, 0016 device-tree platform, 0029
+  unsealed root, 0034 UFS DMA above 4 GiB, ...) into `patches/xnu` and add the
+  `SWEET`/`ARM64_BOARD_CONFIG_SWEET` build defines.
+
 ## Existing guacamole kernel/ADT
 
 - Kernel: `../ios-sweet/ios-sweet/xnu/out-guacamole/kernel.development.guacamole`

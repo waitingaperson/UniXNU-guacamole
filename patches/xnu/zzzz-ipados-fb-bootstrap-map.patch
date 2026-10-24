@@ -141,6 +141,26 @@ index 5c9c64a..cafad97 100644
  }
  
  void
+diff --git a/osfmk/arm/model_dep.c b/osfmk/arm/model_dep.c
+index 0a0e04f..5f52c7f 100644
+--- a/osfmk/arm/model_dep.c
++++ b/osfmk/arm/model_dep.c
+@@ -790,6 +790,15 @@ do_print_all_backtraces(const char *message, uint64_t panic_options)
+ 		panic_print_vnodes();
+ 	}
+ 
++	/*
++	 * Guacamole: the panic log is far longer than the framebuffer console, so
++	 * the first line (the actual panic message) scrolls away. Repeat the head
++	 * of the log here, after every other dump, where it stays visible.
++	 */
++	paniclog_append_noflush("\n========= PANIC MESSAGE (repeated) =========\n");
++	paniclog_append_noflush("%.400s\n", debug_buf_base);
++	paniclog_append_noflush("===========================================\n");
++
+ 	panic_bt_depth--;
+ }
+ 
 diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
 index a688021..0dfe8ae 100644
 --- a/osfmk/arm64/arm_vm_init.c

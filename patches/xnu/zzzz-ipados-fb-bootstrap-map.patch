@@ -1,5 +1,5 @@
 diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
-index c61727c..f16b62a 100644
+index c61727c..de28725 100644
 --- a/osfmk/arm/arm_init.c
 +++ b/osfmk/arm/arm_init.c
 @@ -79,6 +79,8 @@
@@ -20,7 +20,7 @@ index c61727c..f16b62a 100644
  	boot_progress_stage("arm_vm_init returned");
  
  	if (debug_boot_arg) {
-@@ -595,6 +599,8 @@ arm_init(
+@@ -595,27 +599,43 @@ arm_init(
  		(void)switch_to_serial_console(); /* Switch into serial mode from video console */
  		disableConsoleOutput = FALSE;     /* Allow printfs to happen */
  	}
@@ -29,7 +29,17 @@ index c61727c..f16b62a 100644
  	PE_create_console();
  	/*
  	 * The screen acquire below runs in graphics mode, which disables the
-@@ -606,16 +612,24 @@ arm_init(
+ 	 * kernel text console. Ask for the text screen so panic and bring-up
+ 	 * output is drawn on the framebuffer.
+ 	 */
++	/*
++	 * Graphics boot never enables the text console by itself: acquire
++	 * the screen and then ask for the text screen so kprintf and panic
++	 * output is drawn on the framebuffer.
++	 */
++	PE_initialize_console(NULL, kPEAcquireScreen);
+ 	PE_initialize_console(&PE_state.video, kPETextScreen);
+ 
  	/* setup console output */
  	PE_init_printf(FALSE);
  
@@ -54,7 +64,7 @@ index c61727c..f16b62a 100644
  #if __arm64__
  	extern bool cpu_config_correct;
  	if (!cpu_config_correct) {
-@@ -640,6 +654,8 @@ arm_init(
+@@ -640,6 +660,8 @@ arm_init(
  	PE_init_cpu();
  	fiq_context_init(TRUE);
  
@@ -63,7 +73,7 @@ index c61727c..f16b62a 100644
  
  #if HIBERNATION
  	pal_hib_init();
-@@ -668,6 +684,8 @@ arm_init(
+@@ -668,6 +690,8 @@ arm_init(
  	gDramBase = *dram_base;
  	gDramSize = *dram_size;
  

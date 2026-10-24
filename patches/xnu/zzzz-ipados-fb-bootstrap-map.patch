@@ -1,3 +1,24 @@
+diff --git a/iokit/Kernel/IONVRAMCHRPHandler.cpp b/iokit/Kernel/IONVRAMCHRPHandler.cpp
+index bff5658..5a2822d 100644
+--- a/iokit/Kernel/IONVRAMCHRPHandler.cpp
++++ b/iokit/Kernel/IONVRAMCHRPHandler.cpp
+@@ -495,6 +495,16 @@ IONVRAMCHRPHandler::unserializeVariables(void)
+ 
+ 	DEBUG_INFO("...\n");
+ 
++	/*
++	 * Guacamole: without an NVRAM controller image (DarwinBoot exports no
++	 * nvram-proxy-data) there is nothing to unserialize; the old code added
++	 * the region offsets to a NULL _nvramImage and faulted.
++	 */
++	if (_nvramImage == nullptr) {
++		DEBUG_INFO("no nvram image, empty variable set\n");
++		return kIOReturnSuccess;
++	}
++
+ 	for (regionIndex = 0; regionIndex < ARRAY_SIZE(variableRegions); regionIndex++) {
+ 		currentRegion = &variableRegions[regionIndex];
+ 		const uint8_t * imageData = _nvramImage + currentRegion->offset;
 diff --git a/iokit/Kernel/IOUserServer.cpp b/iokit/Kernel/IOUserServer.cpp
 index bdef641..c02186e 100644
 --- a/iokit/Kernel/IOUserServer.cpp

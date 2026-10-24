@@ -141,6 +141,7 @@ kernel_args = [
   "sweetgpu=3",
   "sweetlogdump=1",
   "guac_skip_lockdown=1",
+  "guac_skip_sec_ext=1",
 ]
 
 [payload.adt]

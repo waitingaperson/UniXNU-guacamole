@@ -738,3 +738,32 @@ index 00f98ee..70ecc45 100644
  	/* Register the ipc_pthread_priority manager with the Vouchers sub system. */
  	ipc_register_well_known_mach_voucher_attr_manager(
  		&ipc_pthread_priority_manager,
+diff --git a/security/mac_base.c b/security/mac_base.c
+index 9f90247..5003188 100644
+--- a/security/mac_base.c
++++ b/security/mac_base.c
+@@ -73,6 +73,7 @@
+ #include <string.h>
+ #include <security/mac_internal.h>
+ #include <security/mac_mach_internal.h>
++#include <pexpert/pexpert.h>
+ #include <sys/param.h>
+ #include <sys/vnode.h>
+ #include <sys/vnode_internal.h>
+@@ -371,8 +372,14 @@ mac_policy_initmach(void)
+ 	 * kernel startup.
+ 	 */
+ 
+-	if (load_security_extensions_function) {
+-		load_security_extensions_function();
++	{
++		int guac_skip_sec_ext = 0;
++
++		PE_parse_boot_argn("guac_skip_sec_ext", &guac_skip_sec_ext,
++		    sizeof(guac_skip_sec_ext));
++		if (load_security_extensions_function && !guac_skip_sec_ext) {
++			load_security_extensions_function();
++		}
+ 	}
+ 	mac_late = 1;
+ }

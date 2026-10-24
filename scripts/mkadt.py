@@ -163,17 +163,25 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
     for core in range(1 if qemu else dev['cpus']):
         cpu_nodes.append(node(f'cpu{core}', [
             ph(),
-            ('device_type', cstr('cpu')),
+            ('device_type', cstr(os.environ.get('GUAC_CPU_DEVICE_TYPE', 'cpu'))),
             ('compatible', cstr(dev['cpu_compat']) + cstr('ARM,v8')),
             ('reg', u32(dev['cpu_regs'][core])),  # actual MPIDR Aff1:Aff0, NOT logical ID
             ('cpu-id', u32(core)),   # descriptive: XNU assigns IDs by DT order
             ('cluster-id', u32(0)),  # descriptive; see ml_parse_cpu_topology
-            ('cluster-type', u32(0)),  # homogeneous CLUSTER_TYPE_SMP, not AMP
+            # AppleARMCPU validates cluster-type as the 'E'/'P' value; all cores as
+            # one P cluster keeps a single cluster type for the native SMP port.
+            ('cluster-type', u32(0x50)),
+            ('reg-private', u64(0)),
+            ('l2-access-penalty', u32(0)),
+            ('l2-cache-size', u32(0x1000)),
+            ('l3-cache-size', u32(0x8000)),
+            ('no-aic-ipi-required', u32(1)),
+            ('interrupts', u32(0x40 + core, 0, 0x41 + core)),
             ('die-cluster-id', u32(0)),
             ('cluster-core-id', u32(core)),
             ('l2-cache-id', u32(core)),  # distinct per-core L2 nodes in live FDT
             ('l3-cache-id', u32(0)),     # shared L3
-            ('state', cstr('running' if core == 0 else 'stopped')),
+            ('state', cstr('running' if core == 0 else 'waiting')),
             ('timebase-frequency', u32(timebase)),
             ('clock-frequency', u32(dev['cpu_clocks'][core])),
             ('bus-frequency', u32(dev['bus_frequency'])),
@@ -181,8 +189,17 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
             ('peripheral-frequency', u32(timebase)),
             ('fixed-frequency', u32(timebase)),
         ]))
+    if os.environ.get('GUAC_CPU_NODES'):
+        cpu_nodes = cpu_nodes[:int(os.environ['GUAC_CPU_NODES'])]
+
     cpus = node('cpus', [ph(), ('#address-cells', u32(1)),
-                         ('#size-cells', u32(0))], cpu_nodes)
+                         ('#size-cells', u32(0)),
+                         ('max_cpus', u32(len(cpu_nodes)))], cpu_nodes)
+
+    # AppleARMCPU validates the CPU configuration against the platform's CPU
+    # start conduit; sheng's working ADT publishes /psci, guacamole's did not.
+    psci = None if qemu else node('psci', [ph(), ('compatible', cstr('arm,psci-1.0')),
+                                            ('method', cstr('smc'))])
 
     gic = node('gic', [
         ph(),
@@ -282,7 +299,7 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
         ('manufacturer', cstr('Apple Inc.')),
         ('#address-cells', u32(2)),
         ('#size-cells', u32(2)),
-    ], [chosen, options, defaults, cpus, arm_io, fbcon, buttons, pram] + product + ([] if qemu else [ufs]))
+    ], [chosen, options, defaults, cpus] + ([psci] if psci is not None else []) + [arm_io, fbcon, buttons, pram] + product + ([] if qemu else [ufs]))
 
 
 if __name__ == '__main__':

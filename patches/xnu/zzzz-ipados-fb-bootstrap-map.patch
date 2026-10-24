@@ -315,31 +315,31 @@ index a688021..0dfe8ae 100644
  
  	/*
 diff --git a/osfmk/arm64/machine_routines.c b/osfmk/arm64/machine_routines.c
-index 2056712..7930ca6 100644
+index 7930ca6..fd40284 100644
 --- a/osfmk/arm64/machine_routines.c
 +++ b/osfmk/arm64/machine_routines.c
-@@ -496,9 +496,13 @@ user_timebase_type(void)
- #endif
- }
+@@ -1083,11 +1083,21 @@ ml_parse_cpu_topology(void)
+ 		cpu->cluster_type = CLUSTER_TYPE_SMP;
  
-+extern void sweet_stage_mark(boot_args *args, unsigned int stage);
-+
- void
- machine_startup(__unused boot_args * args)
- {
-+	sweet_stage_mark(args, 60);
-+
- #if defined(HAS_IPI) && (DEVELOPMENT || DEBUG)
- 	if (!PE_parse_boot_argn("fastipi", &gFastIPI, sizeof(gFastIPI))) {
- 		gFastIPI = 1;
-@@ -508,6 +512,7 @@ machine_startup(__unused boot_args * args)
+ 		int cluster_type = (int)ml_readprop(child, "cluster-type", 0);
++#if defined(BCM2837) && !APPLE_ARM64_ARCH_FAMILY
++		/*
++		 * Guacamole: the ADT advertises Apple's 'E'/'P' cluster labels so
++		 * AppleARMCPU's device-tree validation accepts the CPU nodes, but this
++		 * port runs a single homogeneous SMP cluster; taking the labels here
++		 * would create a second physical cluster and trip the cluster asserts.
++		 */
++		(void)cluster_type;
++#else
+ 		if (cluster_type == 'E') {
+ 			cpu->cluster_type = CLUSTER_TYPE_E;
+ 		} else if (cluster_type == 'P') {
+ 			cpu->cluster_type = CLUSTER_TYPE_P;
+ 		}
++#endif
  
- 	machine_conf();
+ 		topology_info.cluster_type_num_cpus[cpu->cluster_type]++;
  
-+	sweet_stage_mark(args, 61);
- 
- 	/*
- 	 * Kick off the kernel bootstrap.
 diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
 index bca4c7c..9a5f645 100644
 --- a/osfmk/arm64/start.s

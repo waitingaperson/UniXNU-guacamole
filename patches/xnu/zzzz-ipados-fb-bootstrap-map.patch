@@ -428,7 +428,7 @@ index f9a166f..d2f9238 100644
  	int howmany;
  	mach_msg_id_t j, pos, nentry, range;
 diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
-index 9114c0d..efe9f2c 100644
+index 9114c0d..865ef2b 100644
 --- a/osfmk/kern/startup.c
 +++ b/osfmk/kern/startup.c
 @@ -107,6 +107,9 @@
@@ -569,7 +569,7 @@ index 9114c0d..efe9f2c 100644
  #endif
  
  	assert(ml_get_interrupts_enabled() == FALSE);
-@@ -710,6 +758,8 @@ kernel_bootstrap_thread(void)
+@@ -710,29 +758,44 @@ kernel_bootstrap_thread(void)
  	 */
  	kernel_startup_initialize_upto(STARTUP_SUB_EARLY_BOOT);
  
@@ -578,7 +578,68 @@ index 9114c0d..efe9f2c 100644
  #if SCHED_HYGIENE_DEBUG
  	// Reset interrupts masked timeout before we enable interrupts
  	ml_spin_debug_clear_self();
-@@ -769,6 +819,8 @@ kernel_bootstrap_thread(void)
+ #endif
+ 	(void) spllo();         /* Allow interruptions */
+ 
++	sweet_stage_mark(NULL, 150);
++
+ 	/*
+ 	 * This will start displaying progress to the user, start as early as possible
+ 	 */
+ 	initialize_screen(NULL, kPEAcquireScreen);
+ 
++	sweet_stage_mark(NULL, 151);
++
+ 	/*
+ 	 *	Initialize the shared region module.
+ 	 */
+ 	vm_commpage_init();
++
++	sweet_stage_mark(NULL, 152);
++
+ 	vm_commpage_text_init();
+ 
++	sweet_stage_mark(NULL, 153);
++
+ #if CONFIG_MACF
+ 	kernel_bootstrap_log("mac_policy_initmach");
+ 	mac_policy_initmach();
++
++	sweet_stage_mark(NULL, 154);
+ #if CONFIG_VNGUARD
+ 	kernel_bootstrap_log("vnguard_policy_init");
+ 	vnguard_policy_init();
++
++	sweet_stage_mark(NULL, 155);
+ #endif
+ #endif
+ 
+@@ -740,6 +803,8 @@ kernel_bootstrap_thread(void)
+ 	kernel_bootstrap_log("dtrace_early_init");
+ 	dtrace_early_init();
+ 	sdt_early_init();
++
++	sweet_stage_mark(NULL, 156);
+ #endif
+ 
+ #if CODE_SIGNING_MONITOR
+@@ -750,11 +815,15 @@ kernel_bootstrap_thread(void)
+ 	 */
+ 	kernel_bootstrap_log("code-signing-monitor lockdown mode");
+ 	csm_check_lockdown_mode();
++
++	sweet_stage_mark(NULL, 157);
+ #endif
+ 
+ #if CODE_SIGNING_MONITOR
+ 	kernel_bootstrap_log("provisioning_profile_init");
+ 	csm_initialize_provisioning_profiles();
++
++	sweet_stage_mark(NULL, 158);
+ #endif
+ 
+ #if !defined(BCM2837) || (defined(XNU_NATIVE_TRUST_CACHE) && XNU_NATIVE_TRUST_CACHE)
+@@ -769,6 +838,8 @@ kernel_bootstrap_thread(void)
  
  	kernel_startup_initialize_upto(STARTUP_SUB_LOCKDOWN);
  
@@ -587,7 +648,7 @@ index 9114c0d..efe9f2c 100644
  	/*
  	 * Get rid of segments used to bootstrap kext loading. This removes
  	 * the KLD, PRELINK symtab, LINKEDIT, and symtab segments/load commands.
-@@ -789,6 +841,8 @@ kernel_bootstrap_thread(void)
+@@ -789,6 +860,8 @@ kernel_bootstrap_thread(void)
  	kernel_bootstrap_log("machine_lockdown");
  	machine_lockdown();
  
@@ -596,7 +657,7 @@ index 9114c0d..efe9f2c 100644
  #ifdef CONFIG_XNUPOST
  	kern_return_t result = kernel_list_tests();
  	result = kernel_do_post();
-@@ -817,6 +871,8 @@ kernel_bootstrap_thread(void)
+@@ -817,6 +890,8 @@ kernel_bootstrap_thread(void)
  	 *	Start the user bootstrap.
  	 */
  #ifdef  MACH_BSD

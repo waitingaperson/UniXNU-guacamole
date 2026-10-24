@@ -1,5 +1,6 @@
---- a/iokit/IOKit/IORPC.h	2026-10-24 16:10:31.907386487 +0800
-+++ b/iokit/IOKit/IORPC.h	2026-10-24 16:10:31.923247007 +0800
+diff -r a/iokit/IOKit/IORPC.h b/iokit/IOKit/IORPC.h
+--- a/iokit/IOKit/IORPC.h	2026-10-24 16:44:54.445637707 +0800
++++ b/iokit/IOKit/IORPC.h	2026-10-24 16:44:54.467099837 +0800
 @@ -190,8 +190,6 @@
  #pragma pack(pop)
  typedef struct IORPCMessage IORPCMessage;
@@ -18,3 +19,57 @@
  
  struct IORPCMessageErrorReturnContent {
  	IORPCMessage  hdr;
+diff -r a/iokit/Kernel/IOUserServer.cpp b/iokit/Kernel/IOUserServer.cpp
+--- a/iokit/Kernel/IOUserServer.cpp	2026-10-24 16:44:54.445880215 +0800
++++ b/iokit/Kernel/IOUserServer.cpp	2026-10-24 16:44:54.463755460 +0800
+@@ -132,7 +132,49 @@
+ 
+ 	virtual void free() override;
+ 	virtual kern_return_t Dispatch(const IORPC rpc) APPLE_KEXT_OVERRIDE;
+-};
++}
++
++/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
++
++IORPCMessage *
++IORPCMessageFromMach(IORPCMessageMach * msg, bool reply)
++{
++	mach_msg_size_t              idx, count;
++	mach_msg_port_descriptor_t * desc;
++	mach_msg_port_descriptor_t * maxDesc;
++	size_t                       size, msgsize;
++	bool                         upgrade;
++
++	msgsize = msg->msgh.msgh_size;
++	count   = msg->msgh_body.msgh_descriptor_count;
++	desc    = &msg->objects[0];
++	maxDesc = (typeof(maxDesc))(((uintptr_t) msg) + msgsize);
++	upgrade = (msg->msgh.msgh_id != (reply ? kIORPCVersionCurrentReply : kIORPCVersionCurrent));
++
++	if (upgrade) {
++		OSReportWithBacktrace("obsolete message");
++		return NULL;
++	}
++
++	for (idx = 0; idx < count; idx++) {
++		if (desc >= maxDesc) {
++			return NULL;
++		}
++		switch (desc->type) {
++		case MACH_MSG_PORT_DESCRIPTOR:
++			size = sizeof(mach_msg_port_descriptor_t);
++			break;
++		case MACH_MSG_OOL_DESCRIPTOR:
++			size = sizeof(mach_msg_ool_descriptor_t);
++			break;
++		default:
++			return NULL;
++		}
++		desc = (typeof(desc))(((uintptr_t) desc) + size);
++	}
++	return (IORPCMessage *)(uintptr_t) desc;
++}
++;
+ OSDefineMetaClassAndStructors(OSUserMetaClass, OSObject);
+ 
+ /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */

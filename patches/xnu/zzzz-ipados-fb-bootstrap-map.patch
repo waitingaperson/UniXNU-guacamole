@@ -605,6 +605,34 @@ index b17e296..706036a 100644
  	const uint32_t qsz = sizeof(struct waitq);
  	vm_offset_t whsize;
  	int cpu = 0;
+diff --git a/osfmk/mach/mig.h b/osfmk/mach/mig.h
+index 8031928..1116d61 100644
+--- a/osfmk/mach/mig.h
++++ b/osfmk/mach/mig.h
+@@ -137,13 +137,21 @@ typedef mig_stub_kern_routine_t mig_kern_routine_t;
+ 
+ typedef mig_kern_routine_t (*mig_kern_server_routine_t) (mach_msg_header_t *InHeadP);
+ 
++/*
++ * Guacamole: the MIG shipped with this toolchain emits the 40-byte
++ * struct routine_descriptor layout for kernel servers (impl, stub, argc,
++ * descr_count, arg_descr pointer, max_reply_msg). Match that layout so the
++ * dispatch table built in ipc_kobject.c reads the real reply sizes; generated
++ * kernel stubs always leave arg_descr zero, so reply_descr_count reads zero.
++ */
+ struct kern_routine_descriptor {
+ 	mig_impl_routine_t      impl_routine;      /* Server work func pointer   */
+ 	mig_stub_kern_routine_t kstub_routine;     /* Unmarshalling func pointer */
+ 	unsigned int            argc;              /* Number of argument words   */
+ 	unsigned int            descr_count;       /* Number complex descriptors */
+-	unsigned int            reply_descr_count; /* Number descriptors in reply */
+-	unsigned int            max_reply_msg;     /* Max size for reply msg */
++	unsigned int            reply_descr_count; /* Descriptors in reply (0)   */
++	unsigned int            arg_descr_high;    /* High half of arg_descr     */
++	unsigned int            max_reply_msg;     /* Max size for reply msg     */
+ };
+ 
+ typedef struct kern_routine_descriptor mig_kern_routine_descriptor;
 diff --git a/osfmk/voucher/ipc_pthread_priority.c b/osfmk/voucher/ipc_pthread_priority.c
 index 00f98ee..70ecc45 100644
 --- a/osfmk/voucher/ipc_pthread_priority.c

@@ -1,6 +1,6 @@
 diff -r C6/bsd/dev/sweet_ufs.c B6/bsd/dev/sweet_ufs.c
 --- C6/bsd/dev/sweet_ufs.c	2026-10-23 23:33:18.129229798 +0800
-+++ B6/bsd/dev/sweet_ufs.c	2026-10-24 08:07:24.986759506 +0800
++++ B6/bsd/dev/sweet_ufs.c	2026-10-24 08:25:29.425931822 +0800
 @@ -65,9 +65,9 @@
  #define CAP_64AS        (1u << 24)              /* 64-bit DMA addressing */
  
@@ -13,43 +13,35 @@ diff -r C6/bsd/dev/sweet_ufs.c B6/bsd/dev/sweet_ufs.c
  #define CMD_TIMEOUT_NS  (5ull * NSEC_PER_SEC)
  #define CMD_SPIN_NS     (50ull * NSEC_PER_USEC)
  #define CMD_SLEEP_NS    (200ull * NSEC_PER_USEC)
-@@ -582,6 +582,9 @@
+@@ -582,6 +582,8 @@
  sweet_ufs_init(void)
  {
  	DTEntry node;
 +
 +	{ extern void sweet_stage_mark(void *args, unsigned int stage); sweet_stage_mark(NULL, 195); }
-+	printf("SWEET UFS: init enter\n");
  	uintptr_t const *reg = NULL;
  	unsigned int size = 0;
  	char want[64] = "userdata";
-@@ -593,6 +596,8 @@
+@@ -593,6 +595,7 @@
  		printf("SWEET UFS: no /sweet-ufs node in the device tree\n");
  		return ENXIO;
  	}
 +	{ extern void sweet_stage_mark(void *args, unsigned int stage); sweet_stage_mark(NULL, 196); }
-+	printf("SWEET UFS: dt ok reg=0x%lx size=0x%x\n", (unsigned long)reg[0], size);
  	PE_parse_boot_argn("ufsroot", want, sizeof(want));
  	uint32_t rw = 0;
  	PE_parse_boot_argn("ufsrw", &rw, sizeof(rw));
-@@ -603,30 +608,42 @@
+@@ -603,6 +606,7 @@
  	su.wait = (wait == 1);
  
  	su.regs = ml_io_map(reg[0], reg[1]);
 +	{ extern void sweet_stage_mark(void *args, unsigned int stage); sweet_stage_mark(NULL, 197); }
-+	printf("SWEET UFS: mapped regs=%p; allocating %u bytes contig\n", (void *)su.regs, (unsigned)DMA_SIZE);
  	if (kmem_alloc_contig(kernel_map, &su.dma, DMA_SIZE, PAGE_MASK, 0, 0,
  	    KMA_DATA | KMA_ZERO | KMA_PERMANENT, VM_KERN_MEMORY_IOKIT) != KERN_SUCCESS) {
  		printf("SWEET UFS: no contiguous DMA memory\n");
- 		return ENOMEM;
- 	}
-+	printf("SWEET UFS: contig dma=0x%llx va=%p\n", (unsigned long long)su.dma, (void *)su.dma);
- 	ppnum_t pn = pmap_find_phys(kernel_pmap, (addr64_t)su.dma);
- 	if (!pn) {
+@@ -613,20 +617,25 @@
  		return ENOMEM;
  	}
  	su.dma_pa = ptoa_64(pn);
-+	printf("SWEET UFS: dma_pa=0x%llx pn=0x%x\n", (unsigned long long)su.dma_pa, (unsigned)pn);
 +	{ extern void sweet_stage_mark(void *args, unsigned int stage); sweet_stage_mark(NULL, 198); }
 +	printf("SWEET UFS: dma at 0x%llx\n", su.dma_pa);
  	su.lun = 0;
@@ -58,7 +50,6 @@ diff -r C6/bsd/dev/sweet_ufs.c B6/bsd/dev/sweet_ufs.c
  	lck_mtx_lock(&sweet_ufs_lock);
  	error = ufs_take_over_host();
 +	{ extern void sweet_stage_mark(void *args, unsigned int stage); sweet_stage_mark(NULL, 199); }
-+	printf("SWEET UFS: takeover -> %d\n", error);
  	if (!error) {
  		static const uint8_t tur[6] = { 0x00 };
  		/* The first command after the bootloader may report a unit attention. */
@@ -66,21 +57,18 @@ diff -r C6/bsd/dev/sweet_ufs.c B6/bsd/dev/sweet_ufs.c
  		}
  	}
 +	{ extern void sweet_stage_mark(void *args, unsigned int stage); sweet_stage_mark(NULL, 200); }
-+	printf("SWEET UFS: tur -> %d\n", error);
  	if (!error) {
  		error = ufs_find_partition(want);
  	}
 +	{ extern void sweet_stage_mark(void *args, unsigned int stage); sweet_stage_mark(NULL, 201); }
-+	printf("SWEET UFS: find partition -> %d\n", error);
  	lck_mtx_unlock(&sweet_ufs_lock);
  	if (error) {
  		return error;
-@@ -640,6 +657,8 @@
+@@ -640,6 +649,7 @@
  	if (su.cmajor < 0) {
  		return ENXIO;
  	}
 +	{ extern void sweet_stage_mark(void *args, unsigned int stage); sweet_stage_mark(NULL, 202); }
-+	printf("SWEET UFS: bdevsw ok major %d\n", su.bmajor);
  	su.bdev = makedev(su.bmajor, 0);
  	devfs_make_node(su.bdev, DEVFS_BLOCK, UID_ROOT, GID_OPERATOR, 0640, "ufsroot0");
  	devfs_make_node(makedev(su.cmajor, 0), DEVFS_CHAR, UID_ROOT, GID_OPERATOR, 0640, "rufsroot0");

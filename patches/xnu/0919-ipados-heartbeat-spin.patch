@@ -1,0 +1,20 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -573,12 +573,13 @@
+ 	extern void sweet_stage_heartbeat(uint64_t value);
+ 
+ 	for (;;) {
+-		uint64_t deadline;
++		volatile uint64_t spin = 0;
+ 
++		while (spin < 40000000ULL) {
++			spin++;
++			__asm__ volatile ("yield" ::: "memory");
++		}
+ 		sweet_stage_heartbeat(++beat);
+-		clock_interval_to_deadline(1, NSEC_PER_SEC, &deadline);
+-		assert_wait_deadline(&sweet_heartbeat_event, THREAD_UNINT, deadline);
+-		(void)thread_block(THREAD_CONTINUE_NULL);
+ 	}
+ 	return NULL;
+ }

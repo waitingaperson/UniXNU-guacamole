@@ -186,7 +186,6 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
         # iBoot normally writes the root volume UUID here; IOKitBSDInit turns it
         # into the IORegistry "boot-uuid" resource and matches the media whose
         # "boot-uuid-media" property carries the same value.
-        *([('system-volume-auth-blob', system_volume_auth_blob)] if system_volume_auth_blob else []),
         ('root-live-fs', u32(1)),
         ('allow-root-hash-mismatch', u32(1)),
     ], [node('memory-map', [ph()]),

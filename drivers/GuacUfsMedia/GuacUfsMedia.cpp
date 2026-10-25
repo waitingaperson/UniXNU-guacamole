@@ -17,16 +17,15 @@ extern "C" int sweet_ufs_media_read(uint64_t off, void *dst, uint64_t len);
 uint64_t guac_media_report[3] = {
 	0xdead0000ULL, 0, 0
 };
-static char guac_media_name[32];
+static char guac_media_bsdname[32];
 static uint32_t guac_media_bdev;
 volatile int guac_media_stage;
 
-static void
-guac_media_watchdog(void *, wait_result_t)
+
+extern "C" const char *
+guac_media_name(void)
 {
-	IOSleep(3000);
-	panic("GUACMEDIA watchdog: stage=%d", guac_media_stage);
-	thread_terminate(current_thread());
+	return guac_media_bsdname[0] ? guac_media_bsdname : nullptr;
 }
 
 extern "C" int
@@ -35,7 +34,7 @@ guac_media_rootdev(const char *name, uint32_t *dev)
 	if (name == nullptr || dev == nullptr || guac_media_bdev == 0) {
 		return -1;
 	}
-	if (strcmp(name, guac_media_name) != 0) {
+	if (strcmp(name, guac_media_bsdname) != 0) {
 		return -1;
 	}
 	*dev = guac_media_bdev;
@@ -220,14 +219,7 @@ guac_media_scan_thread(void *, wait_result_t)
 		matching->release();
 	}
 	sweet_stage_field(count, name, size, 0x5343414eULL);
-	{
-		uint32_t dev = 0;
-		int hit = guac_media_rootdev("disk0", &dev);
-		panic("GUACMEDIA scan: count=%llu name=%s bdev=%08x hit=%d "
-		    "report=%llx/%llx/%llx", count, guac_media_name,
-		    guac_media_bdev, hit, guac_media_report[0],
-		    guac_media_report[1], guac_media_report[2]);
-	}
+
 	thread_terminate(current_thread());
 }
 
@@ -237,13 +229,6 @@ guac_ufs_media_publish(void)
 	IOService *provider;
 	GuacUfsMedia *media;
 	OSDictionary *matching;
-	{
-		thread_t wd = nullptr;
-		if (kernel_thread_start(guac_media_watchdog, nullptr, &wd) == KERN_SUCCESS) {
-			thread_deallocate(wd);
-		}
-	}
-
 	guac_media_stage = 1;
 	matching = IOService::serviceMatching("IOPlatformExpertDevice");
 	if (matching == nullptr) {
@@ -309,7 +294,7 @@ guac_ufs_media_publish(void)
 				OSNumber *maj = OSDynamicCast(OSNumber, service->getProperty("BSD Major"));
 				OSNumber *min = OSDynamicCast(OSNumber, service->getProperty("BSD Minor"));
 				if (bsd != nullptr) {
-					strlcpy(guac_media_name, bsd->getCStringNoCopy(), sizeof(guac_media_name));
+					strlcpy(guac_media_bsdname, bsd->getCStringNoCopy(), sizeof(guac_media_bsdname));
 				}
 				if (maj != nullptr && min != nullptr) {
 					guac_media_bdev = (maj->unsigned32BitValue() << 24) |

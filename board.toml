@@ -140,7 +140,7 @@ kernel_args = [
   "keepsyms=1",
   "-enable_kprintf_spam",
   "-noprogress",
-  "rd=disk0",
+  "rd=ufsroot0",
   "boot-uuid=04769D26-2CA0-4825-B443-E2E5F88300F2",
   "unentitled_ios_sim_launch=1",
   "ignition_level=1",

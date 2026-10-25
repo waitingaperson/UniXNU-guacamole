@@ -1,0 +1,27 @@
+--- a/iokit/bsddev/IOKitBSDInit.cpp
++++ b/iokit/bsddev/IOKitBSDInit.cpp
+@@ -876,6 +876,24 @@
+ 			panic("IOFindBSDRoot: SWEET UFS root %s unavailable: %d", rdBootVar, ufs_error);
+ 		}
+ 		strlcpy(rootName, rdBootVar, rootNameSize);
++#if defined(XNU_GUACMEDIA)
++		/*
++		 * sweet_ufs_rootdev published the root window as an IOMedia. Prefer
++		 * that device: APFS's mount root requires a real IOBlockStorageDevice
++		 * backed IOMedia, not the bare BSD node.
++		 */
++		{
++			extern const char *guac_media_name(void);
++			extern int guac_media_rootdev(const char *name, uint32_t *dev);
++			const char *media_name = guac_media_name();
++			uint32_t media_dev = 0;
++			if (media_name != NULL &&
++			    guac_media_rootdev(media_name, &media_dev) == 0) {
++				*root = media_dev;
++				strlcpy(rootName, media_name, rootNameSize);
++			}
++		}
++#endif
+ 		IOLog("BSD root: %s, major %d, minor %d\n", rootName, major(*root), minor(*root));
+ 		*oflags = 0;
+ 		goto iofrootx;

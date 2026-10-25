@@ -17,6 +17,21 @@ extern "C" int sweet_ufs_media_read(uint64_t off, void *dst, uint64_t len);
 uint64_t guac_media_report[3] = {
 	0xdead0000ULL, 0, 0
 };
+static char guac_media_name[32];
+static uint32_t guac_media_bdev;
+
+extern "C" int
+guac_media_rootdev(const char *name, uint32_t *dev)
+{
+	if (name == nullptr || dev == nullptr || guac_media_bdev == 0) {
+		return -1;
+	}
+	if (strcmp(name, guac_media_name) != 0) {
+		return -1;
+	}
+	*dev = guac_media_bdev;
+	return 0;
+}
 extern "C" uint64_t sweet_ufs_media_bytes(void);
 extern "C" uint32_t sweet_ufs_media_block_size(void);
 
@@ -196,6 +211,14 @@ guac_media_scan_thread(void *, wait_result_t)
 		matching->release();
 	}
 	sweet_stage_field(count, name, size, 0x5343414eULL);
+	{
+		uint32_t dev = 0;
+		int hit = guac_media_rootdev("disk0", &dev);
+		panic("GUACMEDIA scan: count=%llu name=%s bdev=%08x hit=%d "
+		    "report=%llx/%llx/%llx", count, guac_media_name,
+		    guac_media_bdev, hit, guac_media_report[0],
+		    guac_media_report[1], guac_media_report[2]);
+	}
 	thread_terminate(current_thread());
 }
 
@@ -261,6 +284,15 @@ guac_ufs_media_publish(void)
 				}
 				if (bytes != nullptr) {
 					size = bytes->unsigned64BitValue();
+				}
+				OSNumber *maj = OSDynamicCast(OSNumber, service->getProperty("BSD Major"));
+				OSNumber *min = OSDynamicCast(OSNumber, service->getProperty("BSD Minor"));
+				if (bsd != nullptr) {
+					strlcpy(guac_media_name, bsd->getCStringNoCopy(), sizeof(guac_media_name));
+				}
+				if (maj != nullptr && min != nullptr) {
+					guac_media_bdev = (maj->unsigned32BitValue() << 24) |
+					    (min->unsigned32BitValue() & 0xffffff);
 				}
 			}
 			count++;

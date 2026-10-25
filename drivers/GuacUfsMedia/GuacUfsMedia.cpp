@@ -19,6 +19,15 @@ uint64_t guac_media_report[3] = {
 };
 static char guac_media_name[32];
 static uint32_t guac_media_bdev;
+volatile int guac_media_stage;
+
+static void
+guac_media_watchdog(void *, wait_result_t)
+{
+	IOSleep(3000);
+	panic("GUACMEDIA watchdog: stage=%d", guac_media_stage);
+	thread_terminate(current_thread());
+}
 
 extern "C" int
 guac_media_rootdev(const char *name, uint32_t *dev)
@@ -228,16 +237,25 @@ guac_ufs_media_publish(void)
 	IOService *provider;
 	GuacUfsMedia *media;
 	OSDictionary *matching;
+	{
+		thread_t wd = nullptr;
+		if (kernel_thread_start(guac_media_watchdog, nullptr, &wd) == KERN_SUCCESS) {
+			thread_deallocate(wd);
+		}
+	}
 
+	guac_media_stage = 1;
 	matching = IOService::serviceMatching("IOPlatformExpertDevice");
 	if (matching == nullptr) {
 		return -1;
 	}
+	guac_media_stage = 2;
 	provider = IOService::waitForMatchingService(matching, 5000000000ULL);
 	matching->release();
 	if (provider == nullptr) {
 		return -2;
 	}
+	guac_media_stage = 3;
 	media = new GuacUfsMedia;
 	if (media == nullptr) {
 		return -3;
@@ -246,12 +264,15 @@ guac_ufs_media_publish(void)
 		media->release();
 		return -4;
 	}
+	guac_media_stage = 4;
 	if (!media->attach(provider)) {
 		media->release();
 		return -5;
 	}
 	printf("GUACMEDIA: attach done, registering\n");
+	guac_media_stage = 5;
 	media->registerService(kIOServiceSynchronous);
+	guac_media_stage = 6;
 	printf("GUACMEDIA: registered\n");
 	{
 		/*

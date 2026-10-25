@@ -1,0 +1,18 @@
+--- a/osfmk/console/video_console.c
++++ b/osfmk/console/video_console.c
+@@ -1233,7 +1233,14 @@
+ {
+ 	if (boot_progress_active()) { boot_progress_putc(c); return; }
+ 	if (gc_initialized && gc_enabled) {
+-		VCPUTC_LOCK_LOCK();
++		/*
++		 * Guacamole: a stuck console writer must not freeze all later
++		 * boot output. Take the lock over instead of waiting forever.
++		 */
++		if (!lck_ticket_lock_try(&vcputc_lock, &vconsole_lck_grp)) {
++			lck_ticket_init(&vcputc_lock, &vconsole_lck_grp);
++			lck_ticket_lock(&vcputc_lock, &vconsole_lck_grp);
++		}
+ 		if (gc_enabled) {
+ 			gc_hide_cursor(gc_x, gc_y);
+ 			gc_putchar(c);

@@ -1,0 +1,32 @@
+--- a/bsd/vfs/vfs_subr.c
++++ b/bsd/vfs/vfs_subr.c
+@@ -1250,6 +1250,8 @@
+ 	extern uint64_t sweet_ufs_lasterr;
+ 	extern uint64_t sweet_ufs_reads;
+ 	uint64_t sweet_apfs_reads = 0, sweet_hfs_reads = 0;
++	uint64_t sweet_apfs_vfsops = 0, sweet_apfs_mountroot = 0;
++	uint64_t sweet_apfs_flags = 0;
+ 	uint32_t sweet_err_apfs = 0xdead, sweet_err_hfs = 0xbeef;
+ 	uint32_t sweet_err_other = 0;
+ 	/*
+@@ -1276,6 +1278,9 @@
+ 			}
+ 			if (vfsp->vfc_name && strcmp(vfsp->vfc_name, "apfs") == 0) {
+ 				sweet_apfs_reads = sweet_ufs_reads - sweet_before;
++				sweet_apfs_vfsops = (uint64_t)(uintptr_t)vfsp->vfc_vfsops;
++				sweet_apfs_mountroot = (uint64_t)(uintptr_t)vfsp->vfc_mountroot;
++				sweet_apfs_flags = (uint64_t)vfsp->vfc_vfsflags;
+ 			} else if (vfsp->vfc_name && strcmp(vfsp->vfc_name, "hfs") == 0) {
+ 				sweet_hfs_reads = sweet_ufs_reads - sweet_before;
+ 			}
+@@ -1289,8 +1294,8 @@
+ 				sweet_err_other++;
+ 			}
+ 		}
+-		sweet_stage_field(sweet_err_apfs, sweet_apfs_reads,
+-		    sweet_err_hfs, sweet_hfs_reads);
++		sweet_stage_field(sweet_apfs_vfsops, sweet_apfs_mountroot,
++		    sweet_apfs_flags, sweet_err_apfs);
+ 
+ 		if (!error) {
+ 			if (bdevvp_rootvp != rootvp) {

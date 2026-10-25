@@ -1,0 +1,18 @@
+--- a/bsd/dev/sweet_ufs.c
++++ b/bsd/dev/sweet_ufs.c
+@@ -517,6 +517,15 @@
+ 		if (rd) {
+ 			error = ufs_read_blocks(su.first_block + lba, blocks);
+ 			if (!error) {
++				if (lba == 0 && skip == 0 && want >= 64) {
++					uint32_t w[12];
++					dma_copy_from(DMA_BOUNCE, w, sizeof(w));
++					printf("SWEET UFS: window block 0:"
++					    " %08x %08x %08x %08x %08x %08x %08x %08x"
++					    " %08x %08x %08x %08x\n",
++					    w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7],
++					    w[8], w[9], w[10], w[11]);
++				}
+ 				dma_copy_from(DMA_BOUNCE + skip, vaddr + done, want);
+ 			}
+ 		} else {

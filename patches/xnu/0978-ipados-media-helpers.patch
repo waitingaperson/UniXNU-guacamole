@@ -1,0 +1,81 @@
+--- a/bsd/dev/sweet_ufs.c
++++ b/bsd/dev/sweet_ufs.c
+@@ -574,6 +574,66 @@
+ 	buf_biodone(bp);
+ }
+ 
++/*
++ * Window I/O for the IOBlockStorageDevice published by GuacUfsMedia. The
++ * bounce buffer path below is the same one the BSD strategy uses.
++ */
++uint64_t
++sweet_ufs_media_bytes(void)
++{
++	return su.root_bytes ? su.root_bytes : (uint64_t)su.nblocks * UFS_BLOCK;
++}
++
++uint32_t
++sweet_ufs_media_block_size(void)
++{
++	return UFS_BLOCK;
++}
++
++uint64_t sweet_ufs_media_calls;
++uint64_t sweet_ufs_media_io_bytes;
++uint64_t sweet_ufs_media_errs;
++uint64_t sweet_ufs_media_off[4];
++uint64_t sweet_ufs_media_len[4];
++
++int
++sweet_ufs_media_read(uint64_t off, void *dst, uint64_t len)
++{
++	if (sweet_ufs_media_calls < 4) {
++		sweet_ufs_media_off[sweet_ufs_media_calls] = off;
++		sweet_ufs_media_len[sweet_ufs_media_calls] = len;
++	}
++	sweet_ufs_media_calls++;
++	sweet_ufs_media_io_bytes += len;
++	uint64_t part = sweet_ufs_media_bytes();
++	uint8_t *out = (uint8_t *)dst;
++	int error = 0;
++
++	if (off > part || len > part - off) {
++		sweet_ufs_media_errs++;
++		return EINVAL;
++	}
++	lck_mtx_lock(&sweet_ufs_lock);
++	for (uint64_t done = 0; done < len; ) {
++		uint64_t pos = off + done;
++		uint64_t lba = pos / UFS_BLOCK;
++		uint32_t skip = (uint32_t)(pos % UFS_BLOCK);
++		uint32_t want = MIN((uint32_t)(len - done), (uint32_t)(BOUNCE_SIZE - skip));
++		uint32_t blocks = (skip + want + UFS_BLOCK - 1) / UFS_BLOCK;
++		error = ufs_read_blocks(su.first_block + lba, blocks);
++		if (error != 0) {
++			break;
++		}
++		dma_copy_from(DMA_BOUNCE + skip, out + done, want);
++		done += want;
++	}
++	lck_mtx_unlock(&sweet_ufs_lock);
++	if (error != 0) {
++		sweet_ufs_media_errs++;
++	}
++	return error;
++}
++
+ static int
+ sweet_ufs_ioctl(__unused dev_t dev, u_long cmd, caddr_t data, __unused int flag,
+     __unused struct proc *p, int is_char)
+@@ -877,6 +937,11 @@
+ 		    (uint32_t)su.secsize);
+ 		printf("SWEET UFS: media publish -> %d\n", media_error);
+ 	}
++	{
++		extern int guac_ufs_media_publish(void);
++		int media_error = guac_ufs_media_publish();
++		printf("SWEET UFS: block media publish -> %d\n", media_error);
++	}
+ #endif
+ 	/* Only now, with the partition bounds known, can writes be allowed. */
+ 	su.writable = (rw != 0);

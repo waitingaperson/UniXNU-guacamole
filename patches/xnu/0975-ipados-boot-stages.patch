@@ -1,0 +1,39 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -167,6 +167,10 @@
+ #include <netinet/kpi_ipfilter_var.h>   /* for ipfilter_init() */
+ #include <kern/assert.h>
+ 
++extern void sweet_stage_field(uint64_t, uint64_t, uint64_t, uint64_t);
++#define SWEET_STAGE(n) sweet_stage_field((uint64_t)(n), 0, 0x53544745ULL, 0)
++
++
+ #if defined(XNU_SHENG_PMGR) && XNU_SHENG_PMGR
+ /* Bootstrap pass fallback; the explicit sheng PMGR archive wins when linked. */
+ __attribute__((weak)) void
+@@ -1067,6 +1071,7 @@
+ 		boot_progress_stage("vfs_mountroot enter");
+ 		if (0 == (err = vfs_mountroot())) {
+ 			boot_progress_stage("vfs_mountroot mounted; authentication pending");
++			SWEET_STAGE(10);
+ 			break;
+ 		}
+ 		rootdevice[0] = '\0';
+@@ -1086,7 +1091,9 @@
+ 		printf("cannot mount root, errno = %d\n", err);
+ 	}
+ 
++	SWEET_STAGE(20);
+ 	IOSecureBSDRoot(rootdevice);
++	SWEET_STAGE(30);
+ 
+ 	mountlist.tqh_first->mnt_flag |= MNT_ROOTFS;
+ 
+@@ -1100,6 +1107,7 @@
+ 
+ 	lck_rw_lock_exclusive(&rootvnode_rw_lock);
+ 	set_rootvnode(init_rootvnode);
++	SWEET_STAGE(40);
+ 	lck_rw_unlock_exclusive(&rootvnode_rw_lock);
+ 	init_rootvnode = NULLVP;  /* use rootvnode after this point */
+ 

@@ -1,0 +1,28 @@
+--- a/bsd/dev/sweet_ufs.c
++++ b/bsd/dev/sweet_ufs.c
+@@ -258,9 +258,15 @@
+ 		spin_until += mach_absolute_time();
+ 		nanoseconds_to_absolutetime(CMD_SLEEP_NS, &sleep_interval);
+ 	}
++	uint64_t spins = 0;
+ 	while (ufs_rd(REG_UTRLDBR) & 1) {
++		spins++;
+ 		uint64_t now = mach_absolute_time();
+-		if (now > deadline) {
++		if (now > deadline || spins > 200000000ULL) {
++			/* Device tree/framebuffer dump: the console may be wedged. */
++			extern void sweet_stage_field(uint64_t, uint64_t, uint64_t, uint64_t);
++			sweet_stage_field(ufs_rd(REG_UTRLDBR), ufs_rd(REG_IS),
++			    ufs_rd(REG_HCS), (uint64_t)utrd->dw2);
+ 			ufs_wr(REG_UTRLCLR, ~1u);
+ 			printf("SWEET UFS: command 0x%02x timed out\n", cdb[0]);
+ 			return ETIMEDOUT;
+@@ -273,7 +279,7 @@
+ 				thread_block(THREAD_CONTINUE_NULL);
+ 			}
+ 		} else {
+-			delay(1);
++			__asm__ volatile ("wfe" ::: "memory");
+ 		}
+ 	}
+ 	__builtin_arm_dsb(0xf);

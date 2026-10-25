@@ -1,8 +1,9 @@
 // Absolute bindings of GuacUfsMedia to the target kernelcache's IOStorageFamily.
 // The vtable was identified structurally: the unique __DATA_CONST table whose
 // slots match the source-derived method order and 176 of whose pointers equal
-// kernel exports. Slots below are copied from that table; the metaclass comes
-// from the getMetaClass slot. Regenerate when the target kernelcache changes.
+// kernel exports. Method symbols below are the pointers stored in those slots;
+// the metaclass comes from the getMetaClass slot. Regenerate when the target
+// kernelcache changes.
 	.globl __ZN20IOBlockStorageDeviceC2EPK11OSMetaClass
 __ZN20IOBlockStorageDeviceC2EPK11OSMetaClass = 0xfffffff00496ed98
 	.globl __ZN20IOBlockStorageDeviceD2Ev
@@ -12,24 +13,24 @@ __ZN20IOBlockStorageDevice10gMetaClassE = 0xfffffff006add1d0
 	.globl __ZTV20IOBlockStorageDevice
 __ZTV20IOBlockStorageDevice = 0xfffffff005cb44c0
 	.globl __ZN20IOBlockStorageDevice11requestIdleEv
-__ZN20IOBlockStorageDevice11requestIdleEv = 0xfffffff005cb4a98
+__ZN20IOBlockStorageDevice11requestIdleEv = 0xfffffff00496f050
 	.globl __ZN20IOBlockStorageDevice13doSetPriorityEP26IOBlockStorageDeviceExtentjh
-__ZN20IOBlockStorageDevice13doSetPriorityEP26IOBlockStorageDeviceExtentjh = 0xfffffff005cb4aa8
+__ZN20IOBlockStorageDevice13doSetPriorityEP26IOBlockStorageDeviceExtentjh = 0xfffffff00496f068
 	.globl __ZN20IOBlockStorageDevice13setPropertiesEP8OSObject
-__ZN20IOBlockStorageDevice13setPropertiesEP8OSObject = 0xfffffff005cb4630
+__ZN20IOBlockStorageDevice13setPropertiesEP8OSObject = 0xfffffff00496ef38
 	.globl __ZN20IOBlockStorageDevice20doGetProvisionStatusEyyPjP35IOBlockStorageProvisionDeviceExtenty
-__ZN20IOBlockStorageDevice20doGetProvisionStatusEyyPjP35IOBlockStorageProvisionDeviceExtenty = 0xfffffff005cb4ab8
+__ZN20IOBlockStorageDevice20doGetProvisionStatusEyyPjP35IOBlockStorageProvisionDeviceExtenty = 0xfffffff00496f08c
 	.globl __ZN20IOBlockStorageDevice4initEP12OSDictionary
-__ZN20IOBlockStorageDevice4initEP12OSDictionary = 0xfffffff005cb4578
+__ZN20IOBlockStorageDevice4initEP12OSDictionary = 0xfffffff00496ee30
 	.globl __ZN20IOBlockStorageDevice7doUnmapEP26IOBlockStorageDeviceExtentjj
-__ZN20IOBlockStorageDevice7doUnmapEP26IOBlockStorageDeviceExtentjj = 0xfffffff005cb4aa0
+__ZN20IOBlockStorageDevice7doUnmapEP26IOBlockStorageDeviceExtentjj = 0xfffffff00496f05c
 	.globl __ZNK20IOBlockStorageDevice11getPropertyEPK8OSSymbol
-__ZNK20IOBlockStorageDevice11getPropertyEPK8OSSymbol = 0xfffffff005cb45d8
+__ZNK20IOBlockStorageDevice11getPropertyEPK8OSSymbol = 0xfffffff00496ee88
 	.globl __ZN20IOBlockStorageDevice13doSynchronizeEyyj
-__ZN20IOBlockStorageDevice13doSynchronizeEyyj = 0xfffffff005cb4ab0
+__ZN20IOBlockStorageDevice13doSynchronizeEyyj = 0xfffffff00496f080
 	.globl __ZN20IOBlockStorageDevice18doSynchronizeCacheEv
-__ZN20IOBlockStorageDevice18doSynchronizeCacheEv = 0xfffffff005cb4a28
+__ZN20IOBlockStorageDevice18doSynchronizeCacheEv = 0xfffffff00496f074
 	.globl __ZN20IOBlockStorageDevice18getWriteCacheStateEPb
-__ZN20IOBlockStorageDevice18getWriteCacheStateEPb = 0xfffffff005cb4a80
+__ZN20IOBlockStorageDevice18getWriteCacheStateEPb = 0xfffffff00496f038
 	.globl __ZN20IOBlockStorageDevice18setWriteCacheStateEb
-__ZN20IOBlockStorageDevice18setWriteCacheStateEb = 0xfffffff005cb4a88
+__ZN20IOBlockStorageDevice18setWriteCacheStateEb = 0xfffffff00496f044

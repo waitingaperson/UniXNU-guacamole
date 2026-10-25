@@ -277,12 +277,6 @@ guac_ufs_media_publish(void)
 			if (count == 0) {
 				OSString *bsd = OSDynamicCast(OSString, service->getProperty("BSD Name"));
 				OSNumber *bytes = OSDynamicCast(OSNumber, service->getProperty("Size"));
-				/* IOFindBSDRoot matches /chosen/root-matching by this UUID. */
-				OSString *uuid = OSString::withCString("04769D26-2CA0-4825-B443-E2E5F88300F2");
-				if (uuid != nullptr) {
-					service->setProperty("UUID", uuid);
-					uuid->release();
-				}
 				if (bsd != nullptr) {
 					const char *text = bsd->getCStringNoCopy();
 					for (unsigned i = 0; i < 8 && text[i] != '\0'; i++) {

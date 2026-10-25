@@ -1,0 +1,161 @@
+--- a/osfmk/arm64/sweet_stage.c
++++ b/osfmk/arm64/sweet_stage.c
+@@ -95,3 +95,95 @@
+ 	sweet_stage_number(args, stage);
+ 	__asm__ volatile ("dsb sy" ::: "memory");
+ }
++
++/*
++ * Bring-up fault dump: the panic text console is too small to photograph
++ * reliably, so the fault numbers are also drawn as large hex digits
++ * (16 digits, 12x scale) at fixed rows: pc, lr, far, esr.
++ */
++static const uint8_t sweet_hexfont[16][7] = {
++	{ 0x0e, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0e },
++	{ 0x04, 0x0c, 0x04, 0x04, 0x04, 0x04, 0x0e },
++	{ 0x0e, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1f },
++	{ 0x1f, 0x02, 0x04, 0x02, 0x01, 0x11, 0x0e },
++	{ 0x02, 0x06, 0x0a, 0x12, 0x1f, 0x02, 0x02 },
++	{ 0x1f, 0x10, 0x1e, 0x01, 0x01, 0x11, 0x0e },
++	{ 0x06, 0x08, 0x10, 0x1e, 0x11, 0x11, 0x0e },
++	{ 0x1f, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08 },
++	{ 0x0e, 0x11, 0x11, 0x0e, 0x11, 0x11, 0x0e },
++	{ 0x0e, 0x11, 0x11, 0x0f, 0x01, 0x02, 0x0c },
++	{ 0x0e, 0x11, 0x11, 0x1f, 0x11, 0x11, 0x11 },
++	{ 0x1e, 0x11, 0x11, 0x1e, 0x11, 0x11, 0x1e },
++	{ 0x0e, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0e },
++	{ 0x1e, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1e },
++	{ 0x1f, 0x10, 0x1e, 0x10, 0x10, 0x10, 0x1f },
++	{ 0x1f, 0x10, 0x1e, 0x10, 0x10, 0x10, 0x10 },
++};
++
++static uint64_t sweet_fault[4];
++static int sweet_fault_valid;
++
++static void
++sweet_stage_hexline(boot_args *args, uint64_t value, unsigned int y)
++{
++	uint64_t base = args->Video.v_baseAddr;
++	uint32_t stride = (uint32_t)args->Video.v_rowBytes;
++	const uint32_t scale = 12;
++	const uint32_t ox = 24;
++	volatile uint32_t *fb;
++
++	if (base == 0 || stride < 4) {
++		return;
++	}
++	fb = (volatile uint32_t *)(uintptr_t)base;
++	for (uint32_t row = 0; row < 7 * scale; row++) {
++		volatile uint32_t *line = fb + (uint64_t)(y + row) * (stride / 4u);
++		for (uint32_t x = 0; x < 16 * 6 * scale; x++) {
++			line[ox + x] = 0;
++		}
++	}
++	for (unsigned int i = 0; i < 16; i++) {
++		unsigned int digit = (unsigned int)((value >> (60 - 4 * i)) & 0xf);
++		uint32_t dx = ox + i * 6 * scale;
++		for (unsigned int row = 0; row < 7; row++) {
++			uint8_t bits = sweet_hexfont[digit][row];
++			for (unsigned int col = 0; col < 5; col++) {
++				if ((bits & (1u << (4 - col))) == 0) {
++					continue;
++				}
++				for (uint32_t sy = 0; sy < scale; sy++) {
++					volatile uint32_t *line = fb + (uint64_t)(y + row * scale + sy) * (stride / 4u);
++					for (uint32_t sx = 0; sx < scale; sx++) {
++						line[dx + col * scale + sx] = 0xffffffffu;
++					}
++				}
++			}
++		}
++	}
++	__asm__ volatile ("dsb sy" ::: "memory");
++}
++
++void
++sweet_stage_faultredraw(void)
++{
++	boot_args *args = sweet_stage_args;
++
++	if (args == NULL || !sweet_fault_valid) {
++		return;
++	}
++	sweet_stage_hexline(args, sweet_fault[0], 2400);
++	sweet_stage_hexline(args, sweet_fault[1], 2520);
++	sweet_stage_hexline(args, sweet_fault[2], 2640);
++	sweet_stage_hexline(args, sweet_fault[3], 2760);
++}
++
++void
++sweet_stage_faultdump(uint64_t pc, uint64_t lr, uint64_t far, uint64_t esr)
++{
++	sweet_fault[0] = pc;
++	sweet_fault[1] = lr;
++	sweet_fault[2] = far;
++	sweet_fault[3] = esr;
++	sweet_fault_valid = 1;
++	sweet_stage_faultredraw();
++}
+--- a/osfmk/arm64/sleh.c
++++ b/osfmk/arm64/sleh.c
+@@ -1791,6 +1791,11 @@
+ #endif /* CONFIG_XNUPOST */
+ 
+ 		if (fault_addr >= gVirtBase && fault_addr < static_memory_end) {
++			{
++				extern void sweet_stage_faultdump(uint64_t, uint64_t, uint64_t, uint64_t);
++				arm_saved_state64_t *dump = saved_state64(state);
++				sweet_stage_faultdump(dump->pc, dump->lr, fault_addr, (uint64_t)esr);
++			}
+ 			panic_with_thread_kernel_state("Unexpected fault in kernel static region\n", state);
+ 		}
+ 
+@@ -1828,6 +1833,11 @@
+ 		}
+ 
+ 		if (fault_addr >= gVirtBase && fault_addr < static_memory_end) {
++			{
++				extern void sweet_stage_faultdump(uint64_t, uint64_t, uint64_t, uint64_t);
++				arm_saved_state64_t *dump = saved_state64(state);
++				sweet_stage_faultdump(dump->pc, dump->lr, fault_addr, (uint64_t)esr);
++			}
+ 			panic_with_thread_kernel_state("Unexpected fault in kernel static region\n", state);
+ 		}
+ 
+--- a/osfmk/kern/debug.c
++++ b/osfmk/kern/debug.c
+@@ -1232,6 +1232,10 @@
+ 	/*
+ 	 * Not reached.
+ 	 */
++	{
++		extern void sweet_stage_faultredraw(void);
++		sweet_stage_faultredraw();
++	}
+ 	panic_stop();
+ 	__builtin_unreachable();
+ }
+@@ -1240,6 +1244,10 @@
+ panic_spin_forever(void)
+ {
+ 	for (;;) {
++		{
++			extern void sweet_stage_faultredraw(void);
++			sweet_stage_faultredraw();
++		}
+ #if defined(__arm__) || defined(__arm64__)
+ 		/* On arm32, which doesn't have a WFE timeout, this may not return.  But that should be OK on this path. */
+ 		__builtin_arm_wfe();
+--- a/osfmk/arm/model_dep.c
++++ b/osfmk/arm/model_dep.c
+@@ -798,6 +798,10 @@
+ 	paniclog_append_noflush("\n========= PANIC MESSAGE (repeated) =========\n");
+ 	paniclog_append_noflush("%.400s\n", debug_buf_base);
+ 	paniclog_append_noflush("===========================================\n");
++	{
++		extern void sweet_stage_faultredraw(void);
++		sweet_stage_faultredraw();
++	}
+ 
+ 	panic_bt_depth--;
+ }

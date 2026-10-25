@@ -1,0 +1,17 @@
+--- a/osfmk/arm/arm_init.c
++++ b/osfmk/arm/arm_init.c
+@@ -613,6 +613,14 @@
+ 	 * output is drawn on the framebuffer.
+ 	 */
+ 	PE_initialize_console(NULL, kPEAcquireScreen);
++	/*
++	 * Reserve the bottom strip of the framebuffer for the bring-up fault
++	 * dump: the text console never cycles into it, so the large fault
++	 * digits stay readable under the (non-scrolling) panic text.
++	 */
++	if (PE_state.video.v_height > 1400) {
++		PE_state.video.v_height -= 760;
++	}
+ 	PE_initialize_console(&PE_state.video, kPETextScreen);
+ 
+ 	/* setup console output */

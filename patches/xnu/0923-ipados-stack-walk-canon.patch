@@ -1,0 +1,11 @@
+--- a/osfmk/kern/thread.c
++++ b/osfmk/kern/thread.c
+@@ -774,7 +774,7 @@
+ 	/* arm_kernel_saved_state: x[10] then fp */
+ 	fp = *(volatile uint64_t *)(kstack + 80);
+ 	for (int i = 0; i < 4 && fp != 0; i++) {
+-		if ((fp & 7) != 0 || (fp >> 48) != 0xffffff) {
++		if ((fp & 7) != 0 || (fp >> 48) != 0xffff) {
+ 			break;
+ 		}
+ 		frames[i] = *(volatile uint64_t *)(fp + 8);

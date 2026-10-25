@@ -1,0 +1,12 @@
+--- a/bsd/vfs/vfs_subr.c
++++ b/bsd/vfs/vfs_subr.c
+@@ -1294,6 +1294,9 @@
+ 				sweet_err_other++;
+ 			}
+ 		}
++		for (int i = 0; i < 40; i++) {
++			printf("SWEET scroll test %d\n", i);
++		}
+ 		sweet_stage_field(sweet_apfs_vfsops, sweet_apfs_mountroot,
+ 		    sweet_apfs_flags, sweet_err_apfs);
+ 

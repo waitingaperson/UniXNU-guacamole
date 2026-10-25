@@ -9,6 +9,9 @@
 #include <IOKit/IOMemoryDescriptor.h>
 #include <IOKit/storage/IOBlockStorageDevice.h>
 #include <kern/debug.h>
+#include <kern/thread.h>
+
+extern "C" void sweet_stage_field(uint64_t, uint64_t, uint64_t, uint64_t);
 
 extern "C" int sweet_ufs_media_read(uint64_t off, void *dst, uint64_t len);
 uint64_t guac_media_report[3] = {
@@ -159,6 +162,43 @@ GuacUfsMedia::reportWriteProtection(bool *isWriteProtected)
 	return kIOReturnSuccess;
 }
 
+static void
+guac_media_scan_thread(void *, wait_result_t)
+{
+	IOSleep(2000);
+	OSDictionary *matching = IOService::serviceMatching("IOMedia");
+	OSIterator *iterator = matching ? IOService::getMatchingServices(matching) : nullptr;
+	uint64_t count = 0, name = 0, size = 0;
+	while (iterator != nullptr && count < 8) {
+		IOService *service = OSDynamicCast(IOService, iterator->getNextObject());
+		if (service == nullptr) {
+			break;
+		}
+		if (count == 0) {
+			OSString *bsd = OSDynamicCast(OSString, service->getProperty("BSD Name"));
+			OSNumber *bytes = OSDynamicCast(OSNumber, service->getProperty("Size"));
+			if (bsd != nullptr) {
+				const char *text = bsd->getCStringNoCopy();
+				for (unsigned i = 0; i < 8 && text[i] != '\0'; i++) {
+					name = (name << 8) | (unsigned char)text[i];
+				}
+			}
+			if (bytes != nullptr) {
+				size = bytes->unsigned64BitValue();
+			}
+		}
+		count++;
+	}
+	if (iterator != nullptr) {
+		iterator->release();
+	}
+	if (matching != nullptr) {
+		matching->release();
+	}
+	sweet_stage_field(count, name, size, 0x5343414eULL);
+	thread_terminate(current_thread());
+}
+
 extern "C" int
 guac_ufs_media_publish(void)
 {
@@ -196,8 +236,7 @@ guac_ufs_media_publish(void)
 		 * the fixed framebuffer fields instead: media count, first BSD name
 		 * packed eight bytes per line, and its size.
 		 */
-		extern void sweet_stage_field(uint64_t, uint64_t, uint64_t, uint64_t);
-		OSDictionary *matching = IOService::serviceMatching("IOMedia");
+			OSDictionary *matching = IOService::serviceMatching("IOMedia");
 		OSIterator *iterator = matching ? IOService::getMatchingServices(matching) : nullptr;
 		uint64_t count = 0, name = 0, size = 0;
 		while (iterator != nullptr && count < 8) {
@@ -235,6 +274,12 @@ guac_ufs_media_publish(void)
 		guac_media_report[0] = count;
 		guac_media_report[1] = name;
 		guac_media_report[2] = size;
+	}
+	{
+		thread_t thread = nullptr;
+		if (kernel_thread_start(guac_media_scan_thread, nullptr, &thread) == KERN_SUCCESS) {
+			thread_deallocate(thread);
+		}
 	}
 	return 0;
 }

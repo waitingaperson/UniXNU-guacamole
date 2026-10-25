@@ -71,8 +71,12 @@ def ipad_product(dev):
     ]
 
 
-def empty_nvram_proxy():
-    """A fresh volatile CHRP bank for IODTNVRAM, with no controller (sheng format)."""
+def empty_nvram_proxy(variables=()):
+    """A fresh volatile CHRP bank for IODTNVRAM, with no controller (sheng format).
+
+    variables are CHRP "name=value" pairs stored in the common partition, which
+    IONVRAMCHRPHandler unserializes into the Apple NVRAM variables.
+    """
     def header(name, size):
         raw = bytearray(struct.pack('<BBH12s', 0x70, 0, size // 16, name))
         checksum = sum(raw)
@@ -84,7 +88,13 @@ def empty_nvram_proxy():
     image = bytearray(8192)
     image[:16] = header(b'nvram', 32)
     image[32:48] = header(b'common', 16 + 2048)
-    free_at = 32 + 16 + 2048
+    at = 48
+    for name, value in variables:
+        entry = name.encode() + b'=' + value.encode() + b'\0'
+        image[at:at + len(entry)] = entry
+        at += len(entry)
+    image[at] = 0
+    free_at = 48 + 2048
     image[free_at:free_at + 16] = header(b'free', len(image) - free_at)
     struct.pack_into('<I', image, 16, zlib.adler32(image[20:]))
     return [('nvram-bank-size', struct.pack('<I', len(image))),
@@ -130,7 +140,8 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
         ('embedded-panic-log-size', u32(dev.get('panic_size', 0x80000))),
         # ArmDTPlatform::start requires a usable CHRP NVRAM proxy here, and
         # IODTNVRAM picks its handler from these /chosen properties.
-        *empty_nvram_proxy(),
+        *empty_nvram_proxy([('root-live-fs', '1'),
+                             ('allow-root-hash-mismatch', '1')]),
         ('random-seed', seed),
         ('debug-enabled', u32(1)),
         ('firmware-version', cstr('sweet-shim')),

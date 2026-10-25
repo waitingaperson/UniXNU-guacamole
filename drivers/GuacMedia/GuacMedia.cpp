@@ -76,10 +76,12 @@ guac_media_publish(uint32_t major, uint32_t minor, uint64_t size, uint32_t block
 		media->setProperty("Content Hint", name);
 		name->release();
 	}
-	/* APFS picks the root volume by matching this UUID. */
+	/* The root volume identity: APFS picks the volume by this UUID, and
+	 * IOKitBSDInit matches the media through boot-uuid-media. */
 	name = OSString::withCString("04769D26-2CA0-4825-B443-E2E5F88300F2");
 	if (name) {
 		media->setProperty("UUID", name);
+		media->setProperty("boot-uuid-media", name);
 		name->release();
 	}
 	media->setProperty("Whole", kOSBooleanTrue);

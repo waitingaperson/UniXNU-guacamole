@@ -175,6 +175,10 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
         ('effective-security-mode-sep', u32(1)),
         *([('amfi-only-platform-code', u32(1))] if ipad_identity else []),
         *([('root-matching', cstr(root_matching))] if root_matching else []),
+        # iBoot normally writes the root volume UUID here; IOKitBSDInit turns it
+        # into the IORegistry "boot-uuid" resource and matches the media whose
+        # "boot-uuid-media" property carries the same value.
+        *([('boot-uuid', cstr(root_match_uuid.upper()))] if root_match_uuid else []),
     ], [node('memory-map', [ph()]),
         # Local boot policy (kern_csr.c): SIP relaxed like `csrutil disable`
         # (lp-sip0: untrusted kexts, unrestricted FS, task_for_pid, kernel

@@ -8,6 +8,7 @@ per-board profile).
 Usage:  mkadt.py OUT.adt [--device sweet|guacamole] [--dump] [--qemu] [--highmem]
 """
 import hashlib, os, struct, sys, zlib
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import adt      # noqa: E402
@@ -132,6 +133,14 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
             '<key>IOPropertyMatch</key><dict><key>UUID</key><string>'
             + root_match_uuid.upper() + '</string></dict></dict>')
 
+    # iBoot forwards the sealed system volume's IM4P root hash here; APFS's
+    # import_iboot_forwarded_roothash reads /chosen/system-volume-auth-blob.
+    system_volume_auth_blob = None
+    for candidate in (Path(__file__).resolve().parents[1] / 'build/root-hash/SystemVolume.im4p',
+                      Path('build/root-hash/SystemVolume.im4p')):
+        if candidate.is_file():
+            system_volume_auth_blob = candidate.read_bytes()
+            break
     chosen = node('chosen', [
         ph(),
         ('dram-base', u64(phys_base)),
@@ -177,6 +186,7 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
         # iBoot normally writes the root volume UUID here; IOKitBSDInit turns it
         # into the IORegistry "boot-uuid" resource and matches the media whose
         # "boot-uuid-media" property carries the same value.
+        *([('system-volume-auth-blob', system_volume_auth_blob)] if system_volume_auth_blob else []),
     ], [node('memory-map', [ph()]),
         # Local boot policy (kern_csr.c): SIP relaxed like `csrutil disable`
         # (lp-sip0: untrusted kexts, unrestricted FS, task_for_pid, kernel

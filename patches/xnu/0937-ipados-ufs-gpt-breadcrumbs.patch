@@ -1,0 +1,21 @@
+--- a/bsd/dev/sweet_ufs.c
++++ b/bsd/dev/sweet_ufs.c
+@@ -362,14 +362,18 @@
+ 	dma_copy_from(DMA_BOUNCE + 72, &entry_lba, sizeof(entry_lba));
+ 	dma_copy_from(DMA_BOUNCE + 80, &nent, sizeof(nent));
+ 	dma_copy_from(DMA_BOUNCE + 84, &esz, sizeof(esz));
++	printf("SWEET UFS: GPT entries lba=%llu nent=%u esz=%u\n",
++	    (unsigned long long)entry_lba, nent, esz);
+ 	if (esz != 128 || nent == 0 || nent * esz > BOUNCE_SIZE) {
+ 		printf("SWEET UFS: unsupported GPT entries %u x %u\n", nent, esz);
+ 		return ENXIO;
+ 	}
+ 	error = ufs_read_blocks(entry_lba, (nent * esz + UFS_BLOCK - 1) / UFS_BLOCK);
+ 	if (error) {
++		printf("SWEET UFS: GPT entries read failed (%d)\n", error);
+ 		return error;
+ 	}
++	printf("SWEET UFS: GPT entries read ok, scanning for \"%s\"\n", want);
+ 	for (uint32_t i = 0; i < nent; i++) {
+ 		uint32_t eoff = (uint32_t)(DMA_BOUNCE + i * esz);
+ 		char name[37];

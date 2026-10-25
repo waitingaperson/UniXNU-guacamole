@@ -140,7 +140,7 @@ kernel_args = [
   "keepsyms=1",
   "-enable_kprintf_spam",
   "-noprogress",
-  "rd=ufsroot0",
+  "rd=disk0",
   "boot-uuid=04769D26-2CA0-4825-B443-E2E5F88300F2",
   "unentitled_ios_sim_launch=1",
   "ignition_level=1",
@@ -157,7 +157,6 @@ kernel_args = [
   "sweetlogdump=1",
   "guac_skip_rootauth=1",
   "kernel_stack_pages=16",
-  "native-ufs-diagnostics=1",
 ]
 
 [payload.adt]

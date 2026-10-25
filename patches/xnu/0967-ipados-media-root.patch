@@ -1,0 +1,31 @@
+--- a/iokit/bsddev/IOKitBSDInit.cpp
++++ b/iokit/bsddev/IOKitBSDInit.cpp
+@@ -846,6 +846,28 @@
+ 	//	Guacamole: root on a GPT partition of the internal SM8150 UFS
+ 	//	(bsd/dev/sweet_ufs.c). The ABL leaves the host running.
+ 	//
++#if defined(XNU_GUACMEDIA)
++	/*
++	 * Guacamole: root on an IOMedia published by the in-kernel UFS block
++	 * device (GuacUfsMedia). Matching through the registry is unreliable
++	 * here, so the device reports its own BSD identity.
++	 */
++	{
++		extern int guac_media_rootdev(const char *name, uint32_t *dev);
++		uint32_t media_dev = 0;
++		if (rdBootVar[0] &&
++		    guac_media_rootdev(rdBootVar, &media_dev) == 0) {
++			OSSafeReleaseNULL(matching);
++			*root = media_dev;
++			strlcpy(rootName, rdBootVar, rootNameSize);
++			IOLog("BSD root: %s, major %d, minor %d\n", rootName,
++			    major(*root), minor(*root));
++			*oflags = 0;
++			goto iofrootx;
++		}
++	}
++#endif
++
+ 	if (strcmp(rdBootVar, "ufsroot0") == 0) {
+ 		extern int sweet_ufs_rootdev(dev_t *dev);
+ 		OSSafeReleaseNULL(matching);

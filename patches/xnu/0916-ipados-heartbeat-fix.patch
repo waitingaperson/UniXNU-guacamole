@@ -1,0 +1,11 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -576,7 +576,7 @@
+ 		sweet_stage_heartbeat(++beat);
+ 		clock_interval_to_deadline(1, NSEC_PER_SEC, &deadline);
+ 		assert_wait_deadline(NULL, THREAD_UNINT, deadline);
+-		(void)thread_block(THREAD_CONTINUATION_NONE, 0);
++		(void)thread_block(THREAD_CONTINUE_NULL);
+ 	}
+ 	return NULL;
+ }

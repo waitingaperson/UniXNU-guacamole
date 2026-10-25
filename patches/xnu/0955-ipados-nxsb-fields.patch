@@ -1,0 +1,27 @@
+--- a/bsd/dev/sweet_ufs.c
++++ b/bsd/dev/sweet_ufs.c
+@@ -518,13 +518,18 @@
+ 			error = ufs_read_blocks(su.first_block + lba, blocks);
+ 			if (!error) {
+ 				if (lba == 0 && skip == 0 && want >= 64) {
+-					uint32_t w[12];
++					uint64_t w[6];
++					extern void sweet_stage_field(uint64_t, uint64_t,
++					    uint64_t, uint64_t);
++					/*
++					 * The console line scrolls away; park the four
++					 * interesting words below it where the photo can
++					 * read them. Expected (little endian):
++					 *   d58c734b6db8de9d 0000000000000001
++					 *   000010004253584e 00000000000016a4
++					 */
+ 					dma_copy_from(DMA_BOUNCE, w, sizeof(w));
+-					printf("SWEET UFS: window block 0:"
+-					    " %08x %08x %08x %08x %08x %08x %08x %08x"
+-					    " %08x %08x %08x %08x\n",
+-					    w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7],
+-					    w[8], w[9], w[10], w[11]);
++					sweet_stage_field(w[0], w[2], w[4], w[5]);
+ 				}
+ 				dma_copy_from(DMA_BOUNCE + skip, vaddr + done, want);
+ 			}

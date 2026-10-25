@@ -157,6 +157,8 @@ kernel_args = [
   "sweetlogdump=1",
   "guac_skip_rootauth=1",
   "kernel_stack_pages=16",
+  "allow-root-hash-mismatch=1",
+  "root-live-fs=1",
 ]
 
 [payload.adt]

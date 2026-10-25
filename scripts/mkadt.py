@@ -187,6 +187,8 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
         # into the IORegistry "boot-uuid" resource and matches the media whose
         # "boot-uuid-media" property carries the same value.
         *([('system-volume-auth-blob', system_volume_auth_blob)] if system_volume_auth_blob else []),
+        ('root-live-fs', u32(1)),
+        ('allow-root-hash-mismatch', u32(1)),
     ], [node('memory-map', [ph()]),
         # Local boot policy (kern_csr.c): SIP relaxed like `csrutil disable`
         # (lp-sip0: untrusted kexts, unrestricted FS, task_for_pid, kernel

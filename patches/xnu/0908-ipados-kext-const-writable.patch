@@ -1,0 +1,16 @@
+--- a/osfmk/arm64/arm_vm_init.c
++++ b/osfmk/arm64/arm_vm_init.c
+@@ -1650,7 +1650,12 @@
+ 
+ 	/* tighten permissions on kext read only data and code */
+ 	arm_vm_page_granular_RNX(segPRELINKTEXTB, segSizePRELINKTEXT, ARM64_GRANULE_ALLOW_BLOCK);
+-	arm_vm_page_granular_RNX(segPLKDATACONSTB, segSizePLKDATACONST, ARM64_GRANULE_ALLOW_BLOCK);
++	/*
++	 * Guacamole: keep the coalesced kext __DATA_CONST writable. CoreTrust
++	 * populates lazily bound const tables (__const) during its start; with
++	 * the page locked read-only that store takes a permission fault.
++	 */
++	arm_vm_page_granular_RWNX(segPLKDATACONSTB, segSizePLKDATACONST, ARM64_GRANULE_ALLOW_BLOCK);
+ 
+ 	cpu_stack_alloc(&BootCpuData);
+ 	arm64_replace_bootstack(&BootCpuData);

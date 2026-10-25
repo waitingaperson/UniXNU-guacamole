@@ -1,0 +1,18 @@
+--- a/osfmk/arm64/arm_vm_init.c
++++ b/osfmk/arm64/arm_vm_init.c
+@@ -1743,7 +1743,14 @@
+ 	 */
+ #endif
+ 
+-	arm_vm_page_granular_RNX(segDATACONSTB, segSizeDATACONST, ARM64_GRANULE_ALLOW_BLOCK);
++	/*
++	 * Guacamole: do not lock the kernel __DATA_CONST at lockdown. The
++	 * CoreTrust kext registers its interface (coretrust_interface_register)
++	 * during IOKit startup, after machine_lockdown(), and that stores into
++	 * a SECURITY_READ_ONLY_LATE slot of __DATA_CONST. Keep the segment
++	 * writable for the bring-up kernel.
++	 */
++	arm_vm_page_granular_RWNX(segDATACONSTB, segSizeDATACONST, ARM64_GRANULE_ALLOW_BLOCK);
+ 
+ 	__builtin_arm_dsb(DSB_ISH);
+ 	flush_mmu_tlb();

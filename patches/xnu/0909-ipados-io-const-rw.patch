@@ -1,0 +1,50 @@
+--- a/osfmk/arm64/arm_vm_init.c
++++ b/osfmk/arm64/arm_vm_init.c
+@@ -1183,6 +1183,23 @@
+ 	arm_vm_page_granular_prot(start, size, 0, 1, AP_RWNA, 1, granule);
+ }
+ 
++/*
++ * Guacamole: called just before IOKit starts the early kexts. The kext
++ * __DATA_CONST pages are mapped read-only when the kernel finalizes the boot
++ * protections, but some prelinked kexts (CoreTrust) write lazily initialized
++ * const tables during start. Remap the coalesced segment writable again.
++ */
++void
++sweet_rw_kext_const(void)
++{
++	if (segPLKDATACONSTB == 0 || segSizePLKDATACONST == 0) {
++		return;
++	}
++	arm_vm_page_granular_RWNX(segPLKDATACONSTB, segSizePLKDATACONST, ARM64_GRANULE_ALLOW_BLOCK);
++	__builtin_arm_dsb(DSB_ISH);
++	flush_mmu_tlb();
++}
++
+ // Populate seg...AuxKC and fixup AuxKC permissions
+ static bool
+ arm_vm_auxkc_init(void)
+@@ -1656,6 +1673,7 @@
+ 	 * the page locked read-only that store takes a permission fault.
+ 	 */
+ 	arm_vm_page_granular_RWNX(segPLKDATACONSTB, segSizePLKDATACONST, ARM64_GRANULE_ALLOW_BLOCK);
++	flush_mmu_tlb();
+ 
+ 	cpu_stack_alloc(&BootCpuData);
+ 	arm64_replace_bootstack(&BootCpuData);
+--- a/iokit/Kernel/IOStartIOKit.cpp
++++ b/iokit/Kernel/IOStartIOKit.cpp
+@@ -132,9 +132,13 @@
+ 
+ extern void sweet_stage_mark(struct boot_args *args, unsigned int stage);
+ 
++extern "C" void sweet_rw_kext_const(void);
++
+ void
+ InitIOKit(void *dtTop)
+ {
++	sweet_rw_kext_const();
++
+ 	// Compat for boot-args
+ 	gIOKitTrace |= (gIOKitDebug & kIOTraceCompatBootArgs);
+ 

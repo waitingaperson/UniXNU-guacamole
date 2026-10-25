@@ -1,0 +1,38 @@
+--- a/osfmk/arm64/sweet_stage.c
++++ b/osfmk/arm64/sweet_stage.c
+@@ -180,10 +180,16 @@
+ void
+ sweet_stage_faultdump(uint64_t pc, uint64_t lr, uint64_t far, uint64_t esr)
+ {
+-	sweet_fault[0] = pc;
+-	sweet_fault[1] = lr;
+-	sweet_fault[2] = far;
+-	sweet_fault[3] = esr;
+-	sweet_fault_valid = 1;
++	/*
++	 * Keep the first fault seen: a nested panic would otherwise replace the
++	 * numbers of the fault that actually started the panic.
++	 */
++	if (!sweet_fault_valid) {
++		sweet_fault[0] = pc;
++		sweet_fault[1] = lr;
++		sweet_fault[2] = far;
++		sweet_fault[3] = esr;
++		sweet_fault_valid = 1;
++	}
+ 	sweet_stage_faultredraw();
+ }
+--- a/osfmk/arm64/sleh.c
++++ b/osfmk/arm64/sleh.c
+@@ -469,6 +469,11 @@
+ 	ss_valid = is_saved_state64(ss);
+ 	arm_saved_state64_t *state = saved_state64(ss);
+ 
++	if (ss_valid) {
++		extern void sweet_stage_faultdump(uint64_t, uint64_t, uint64_t, uint64_t);
++		sweet_stage_faultdump(state->pc, state->lr, state->far, state->esr);
++	}
++
+ 	os_atomic_cmpxchg(&original_faulting_state, NULL, state, seq_cst);
+ 
+ 	// rdar://80659177

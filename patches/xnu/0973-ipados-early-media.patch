@@ -1,0 +1,21 @@
+--- a/iokit/bsddev/IOKitBSDInit.cpp
++++ b/iokit/bsddev/IOKitBSDInit.cpp
+@@ -731,6 +731,18 @@
+ IOFindBSDRoot( char * rootName, unsigned int rootNameSize,
+     dev_t * root, u_int32_t * oflags )
+ {
++#if defined(XNU_GUACMEDIA)
++	/*
++	 * Bring the internal UFS window up and publish its IOBlockStorageDevice
++	 * before selecting the root. The APFS container scheme then has a media
++	 * to match, exactly as sheng's read-only OS media does.
++	 */
++	{
++		extern int sweet_ufs_rootdev(dev_t *dev);
++		dev_t ufs_dev = 0;
++		(void)sweet_ufs_rootdev(&ufs_dev);
++	}
++#endif
+ 	mach_timespec_t     t;
+ 	IOService *         service;
+ 	IORegistryEntry *   regEntry;

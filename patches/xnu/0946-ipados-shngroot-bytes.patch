@@ -1,0 +1,48 @@
+--- a/bsd/dev/sweet_ufs.c
++++ b/bsd/dev/sweet_ufs.c
+@@ -100,6 +100,7 @@
+ 	uint8_t lun;
+ 	uint8_t tag;
+ 	uint64_t first_block, nblocks;          /* partition, in 4 KiB device blocks */
++	uint64_t root_bytes;                    /* exact root window size, bytes */
+ 	uint32_t secsize;                       /* logical sector size for the BSD layer */
+ 	bool writable;                          /* boot-arg ufsrw=1 */
+ 	bool cache;                             /* boot-arg ufscache=1 */
+@@ -558,7 +559,7 @@
+ 		*f = UFS_BLOCK;
+ 		return 0;
+ 	case DKIOCGETBLOCKCOUNT:
+-		*o = su.nblocks * UFS_BLOCK / su.secsize;
++		*o = (su.root_bytes ? su.root_bytes : su.nblocks * UFS_BLOCK) / su.secsize;
+ 		return 0;
+ 	case DKIOCISWRITABLE:
+ 		*f = su.writable;
+@@ -603,7 +604,7 @@
+ static int
+ sweet_ufs_psize(__unused dev_t dev)
+ {
+-	return su.ready ? (int)MIN(su.nblocks * UFS_BLOCK / su.secsize, INT_MAX) : -1;
++	return su.ready ? (int)MIN((su.root_bytes ? su.root_bytes : su.nblocks * UFS_BLOCK) / su.secsize, INT_MAX) : -1;
+ }
+ 
+ static int
+@@ -744,8 +745,7 @@
+ 	name[32] = 0;
+ 	dma_copy_from(DMA_BOUNCE + 24 + 32, &offset, sizeof(offset));
+ 	dma_copy_from(DMA_BOUNCE + 24 + 40, &size, sizeof(size));
+-	if (size == 0 || offset >= image_bytes ||
+-	    (offset % UFS_BLOCK) != 0 || (size % UFS_BLOCK) != 0 ||
++	if (size == 0 || offset >= image_bytes || (offset % UFS_BLOCK) != 0 ||
+ 	    offset + size > (uint64_t)su.nblocks * UFS_BLOCK) {
+ 		printf("SWEET UFS: SHNGROOT window \"%s\" outside the partition\n", name);
+ 		return EINVAL;
+@@ -754,7 +754,8 @@
+ 	    name, (unsigned long long)offset, (unsigned long long)size,
+ 	    (unsigned long long)image_bytes);
+ 	su.first_block += offset / UFS_BLOCK;
+-	su.nblocks = size / UFS_BLOCK;
++	su.root_bytes = size;
++	su.nblocks = (size + UFS_BLOCK - 1) / UFS_BLOCK;
+ 	return 0;
+ }
+ 

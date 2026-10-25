@@ -116,6 +116,9 @@ if [ "$BOOTSTRAP" = 0 ]; then
   python3 scripts/build-corecrypto-14.py --namespace
   python3 scripts/build-arm-driver.py ArmDTPlatform
   python3 scripts/build-arm-driver.py ArmCpu
+  python3 scripts/build-arm-driver.py GuacMedia
+  # The bootstrap pass has no archive; only the full pass references it.
+  EXTRA_CFLAGS="${EXTRA_CFLAGS:-} -DXNU_GUACMEDIA=1"
   python3 scripts/build-libpthread-kernel.py
 fi
 BOOT_PROGRESS=${XNU_BOOT_PROGRESS:-0}
@@ -653,6 +656,16 @@ if [ "${XNU_SOURCE_CORECRYPTO14:-0}" = 1 ] && [ "$BOOTSTRAP" = 0 ]; then
   fi
   # The SM8150 UFS root driver is built into the kernel (bsd/dev/sweet_ufs.c);
   # the external NativeUfs IOKit archive is not part of this configuration.
+  GUAC_MEDIA_ARCHIVE=$ROOT/build/guac-media/libGuacMedia.a
+  test -f "$GUAC_MEDIA_ARCHIVE"
+  KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES -Wl,-force_load,$GUAC_MEDIA_ARCHIVE"
+  KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $GUAC_MEDIA_ARCHIVE"
+  if [ "${XNU_TEST_NATIVEUFS:-0}" = 1 ]; then
+    TEST_ARCHIVE=$ROOT/build/native-ufs/libNativeUfs.a
+    test -f "$TEST_ARCHIVE"
+    KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES -Wl,-force_load,$TEST_ARCHIVE"
+    KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $TEST_ARCHIVE"
+  fi
   if [ "${XNU_NATIVE_ADRENO:-0}" = 1 ]; then
     # NativeAdreno plus its kits (scripts/build-native-adreno-kits.py). No personality is installed: the
     # board probe calls NativeAdrenoGmuContextBringup directly once it has powered the GPU CX domain.

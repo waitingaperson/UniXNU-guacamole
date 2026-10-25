@@ -1,0 +1,15 @@
+--- a/bsd/dev/sweet_ufs.c
++++ b/bsd/dev/sweet_ufs.c
+@@ -834,6 +834,12 @@
+ 	su.bdev = makedev(su.bmajor, 0);
+ 	devfs_make_node(su.bdev, DEVFS_BLOCK, UID_ROOT, GID_OPERATOR, 0640, "ufsroot0");
+ 	devfs_make_node(makedev(su.cmajor, 0), DEVFS_CHAR, UID_ROOT, GID_OPERATOR, 0640, "rufsroot0");
++	{
++		extern int guac_media_publish(uint32_t, uint32_t, uint64_t, uint32_t);
++		guac_media_publish((uint32_t)major(su.bdev), (uint32_t)minor(su.bdev),
++		    su.root_bytes ? su.root_bytes : su.nblocks * UFS_BLOCK,
++		    (uint32_t)su.secsize);
++	}
+ 	/* Only now, with the partition bounds known, can writes be allowed. */
+ 	su.writable = (rw != 0);
+ 	su.ready = true;

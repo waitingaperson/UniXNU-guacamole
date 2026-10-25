@@ -60,6 +60,19 @@ fetch = ["KernelCache", "DeviceTree", "StaticTrustCache", "Cryptex1,SystemTrustC
 "044-76040-038.dmg" = "3f99b859c9728379110b66657c7b15285bcb1925ad8b5726542e2cdcf8b1028d"
 "044-76034-038.dmg" = "b4908cde41d23e6bc05e6af51a2c9eeb00cf0f863a6a18b1600c96a3fd70414f"
 
+
+[userdata]
+# The phone's "userdata" GPT partition (observed: first block 0x1b188, 22278 MiB,
+# 4 KiB sectors). The SHNGROOT image is flashed here; the kernel's UFS driver
+# exposes the first window (OS) as the root block device.
+first_lba = 0x1b188
+last_lba = 0x58b787
+lba_bytes = 4096
+windows = [
+  { name = "OS", component = "OS" },
+  { name = "SystemOS", component = "Cryptex1,SystemOS" },
+]
+
 [kernel]
 # 4 KiB BCM2837 build with the xnu-10063.141.1 (iPadOS 17.7.11) source.
 defconfig = "guacamole_10063_defconfig"
@@ -68,6 +81,7 @@ archives = [
   "build-corecrypto-14.py --namespace",
   "build-arm-driver.py ArmDTPlatform",
   "build-arm-driver.py ArmCpu",
+  "build-arm-driver.py GuacMedia",
   "build-libpthread-kernel.py",
 ]
 

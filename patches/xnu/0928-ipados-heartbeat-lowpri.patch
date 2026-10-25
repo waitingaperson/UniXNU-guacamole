@@ -1,0 +1,31 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -573,8 +573,11 @@
+ 	uint64_t beat = 0;
+ 	extern void sweet_stage_heartbeat(uint64_t value);
+ 
++	/* Run below the boot threads so sampling cannot starve them. */
++	thread_set_priority(current_thread(), 1);
++
+ 	for (;;) {
+-		for (int i = 0; i < 1000; i++) {
++		for (int i = 0; i < 2000; i++) {
+ 			thread_yield_to_preemption();
+ 		}
+ 		sweet_stage_heartbeat(++beat);
+@@ -582,15 +585,6 @@
+ 		if (beat > 1) {
+ 			extern void sweet_boot_stackdump(thread_t);
+ 			sweet_boot_stackdump(sweet_boot_thread);
+-		}
+-		if (beat >= 3) {
+-			/*
+-			 * The heartbeat has shown the stack and the counter; park
+-			 * this thread so it cannot starve the boot thread's
+-			 * worker threads on a preemption-starved scheduler.
+-			 */
+-			assert_wait(&sweet_heartbeat_event, THREAD_UNINT);
+-			(void)thread_block(THREAD_CONTINUE_NULL);
+ 		}
+ 	}
+ 	return NULL;

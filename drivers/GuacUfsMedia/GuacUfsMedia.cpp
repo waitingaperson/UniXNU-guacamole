@@ -143,7 +143,8 @@ char *GuacUfsMedia::getAdditionalDeviceInfoString(void) { return (char *)""; }
 IOReturn
 GuacUfsMedia::reportBlockSize(UInt64 *blockSize)
 {
-	*blockSize = sweet_ufs_media_block_size();
+	/* IOStorageFamily and APFS address the device in 512-byte sectors. */
+	*blockSize = 512;
 	return kIOReturnSuccess;
 }
 
@@ -157,7 +158,7 @@ GuacUfsMedia::reportEjectability(bool *isEjectable)
 IOReturn
 GuacUfsMedia::reportMaxValidBlock(UInt64 *maxBlock)
 {
-	*maxBlock = sweet_ufs_media_bytes() / sweet_ufs_media_block_size() - 1;
+	*maxBlock = sweet_ufs_media_bytes() / 512 - 1;
 	return kIOReturnSuccess;
 }
 

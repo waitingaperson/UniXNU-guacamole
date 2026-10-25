@@ -1,0 +1,19 @@
+--- a/bsd/dev/sweet_ufs.c
++++ b/bsd/dev/sweet_ufs.c
+@@ -601,6 +601,16 @@
+ 	 * and kmem_alloc_contig sleeps forever when it cannot find a
+ 	 * contiguous run there.
+ 	 */
++	{
++		kern_return_t kr = SecureDTLookupEntry(NULL, "/ufs-dma", &node);
++		printf("SWEET UFS: /ufs-dma lookup %d\n", kr);
++		if (kr == kSuccess) {
++			kern_return_t gp = SecureDTGetProperty(node, "reg",
++			    (void const **)&reg, &size);
++			printf("SWEET UFS: /ufs-dma reg %d size %u first %llx\n", gp, size,
++			    gp == kSuccess ? (unsigned long long)reg[0] : 0ULL);
++		}
++	}
+ 	if (SecureDTLookupEntry(NULL, "/ufs-dma", &node) == kSuccess &&
+ 	    SecureDTGetProperty(node, "reg", (void const **)&reg, &size) == kSuccess &&
+ 	    size >= 2 * sizeof(uintptr_t) && reg[0] != 0 &&

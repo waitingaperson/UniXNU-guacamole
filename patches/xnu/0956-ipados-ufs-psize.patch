@@ -1,0 +1,16 @@
+--- a/bsd/dev/sweet_ufs.c
++++ b/bsd/dev/sweet_ufs.c
+@@ -628,7 +628,12 @@
+ static int
+ sweet_ufs_psize(__unused dev_t dev)
+ {
+-	return su.ready ? (int)MIN((su.root_bytes ? su.root_bytes : su.nblocks * UFS_BLOCK) / su.secsize, INT_MAX) : -1;
++	/*
++	 * d_psize feeds v_specsize, which spec_read/spec_write use as the
++	 * device block size. Returning the block count here makes every
++	 * non-zero file offset map back to block 0.
++	 */
++	return su.ready ? (int)su.secsize : -1;
+ }
+ 
+ static int

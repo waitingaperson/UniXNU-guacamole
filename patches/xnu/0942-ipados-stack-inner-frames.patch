@@ -1,0 +1,19 @@
+--- a/osfmk/kern/thread.c
++++ b/osfmk/kern/thread.c
+@@ -781,11 +781,11 @@
+ 		deeper[i] = *(volatile uint64_t *)(fp + 8);
+ 		fp = *(volatile uint64_t *)fp;
+ 	}
+-	// Skip the context-switch/sleep frames and show the real callers.
+-	frames[0] = deeper[4];
+-	frames[1] = deeper[5];
+-	frames[2] = deeper[6];
+-	frames[3] = deeper[7];
++	// Innermost frames: where the thread is actually blocked.
++	frames[0] = deeper[0];
++	frames[1] = deeper[1];
++	frames[2] = deeper[2];
++	frames[3] = deeper[3];
+ 	sweet_stage_stackdump(frames[0], frames[1], frames[2], frames[3]);
+ }
+ 

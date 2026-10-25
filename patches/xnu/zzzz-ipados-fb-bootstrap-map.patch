@@ -19,6 +19,61 @@ index bff5658..5a2822d 100644
  	for (regionIndex = 0; regionIndex < ARRAY_SIZE(variableRegions); regionIndex++) {
  		currentRegion = &variableRegions[regionIndex];
  		const uint8_t * imageData = _nvramImage + currentRegion->offset;
+diff --git a/iokit/Kernel/IOStartIOKit.cpp b/iokit/Kernel/IOStartIOKit.cpp
+index d74c063..df80909 100644
+--- a/iokit/Kernel/IOStartIOKit.cpp
++++ b/iokit/Kernel/IOStartIOKit.cpp
+@@ -130,6 +130,8 @@ iokit_post_constructor_init(void)
+  */
+ void (*record_startup_extensions_function)(void) = NULL;
+ 
++extern void sweet_stage_mark(struct boot_args *args, unsigned int stage);
++
+ void
+ InitIOKit(void *dtTop)
+ {
+@@ -144,14 +146,24 @@ InitIOKit(void *dtTop)
+ 	// initialise as basic OS services.
+ 	//
+ 	IOLibInit();
++
++	sweet_stage_mark(NULL, 170);
++
+ 	OSlibkernInit();
++
++	sweet_stage_mark(NULL, 171);
++
+ 	IOMachPortInitialize();
+ 
++	sweet_stage_mark(NULL, 172);
++
+ 	gIOProgressBackbufferKey  = OSSymbol::withCStringNoCopy(kIOProgressBackbufferKey);
+ 	gIORemoveOnReadProperties = OSSet::withObjects((const OSObject **) &gIOProgressBackbufferKey, 1);
+ 
+ 	interruptAccountingInit();
+ 
++	sweet_stage_mark(NULL, 173);
++
+ 	gRootNub = new IOPlatformExpertDevice;
+ 	if (__improbable(gRootNub == NULL)) {
+ 		panic("Failed to allocate IOKit root nub");
+@@ -162,12 +174,16 @@ InitIOKit(void *dtTop)
+ 	}
+ 	gRootNub->attach(NULL);
+ 
++	sweet_stage_mark(NULL, 175);
++
+ 	/* If the bootstrap segment set up a function to record startup
+ 	 * extensions, call it now.
+ 	 */
+ 	if (record_startup_extensions_function) {
+ 		record_startup_extensions_function();
+ 	}
++
++	sweet_stage_mark(NULL, 176);
+ }
+ 
+ void
 diff --git a/iokit/Kernel/IOUserServer.cpp b/iokit/Kernel/IOUserServer.cpp
 index bdef641..c02186e 100644
 --- a/iokit/Kernel/IOUserServer.cpp

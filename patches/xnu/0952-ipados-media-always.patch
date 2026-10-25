@@ -1,0 +1,18 @@
+--- a/bsd/dev/sweet_ufs.c
++++ b/bsd/dev/sweet_ufs.c
+@@ -834,7 +834,6 @@
+ 	su.bdev = makedev(su.bmajor, 0);
+ 	devfs_make_node(su.bdev, DEVFS_BLOCK, UID_ROOT, GID_OPERATOR, 0640, "ufsroot0");
+ 	devfs_make_node(makedev(su.cmajor, 0), DEVFS_CHAR, UID_ROOT, GID_OPERATOR, 0640, "rufsroot0");
+-#if defined(XNU_GUACMEDIA)
+ 	{
+ 		extern int guac_media_publish(uint32_t, uint32_t, uint64_t, uint32_t);
+ 		int media_error = guac_media_publish((uint32_t)major(su.bdev),
+@@ -843,7 +842,6 @@
+ 		    (uint32_t)su.secsize);
+ 		printf("SWEET UFS: media publish -> %d\n", media_error);
+ 	}
+-#endif
+ 	/* Only now, with the partition bounds known, can writes be allowed. */
+ 	su.writable = (rw != 0);
+ 	su.ready = true;

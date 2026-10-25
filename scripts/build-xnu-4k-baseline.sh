@@ -109,6 +109,11 @@ if [ "$BOOTSTRAP" != 0 ] && [ "$BOOTSTRAP" != 1 ]; then
   echo 'XNU_BOOTSTRAP must be 0 or 1' >&2
   exit 1
 fi
+if [ "$BOOTSTRAP" = 1 ]; then
+  # The full pass compiles sweet_ufs.c with the GuacMedia reference; rebuild it
+  # here without it, since the bootstrap link carries no board archives.
+  touch .cache/xnu-work/bsd/dev/sweet_ufs.c
+fi
 if [ "$BOOTSTRAP" = 0 ]; then
   # The b6ae99c driver builds these between passes; the current main driver
   # does not, so build the board archives here before the full link.
@@ -659,6 +664,8 @@ if [ "${XNU_SOURCE_CORECRYPTO14:-0}" = 1 ] && [ "$BOOTSTRAP" = 0 ]; then
   GUAC_MEDIA_ARCHIVE=$ROOT/build/guac-media/libGuacMedia.a
   test -f "$GUAC_MEDIA_ARCHIVE"
   KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES -Wl,-force_load,$GUAC_MEDIA_ARCHIVE"
+  EXTRA_CFLAGS="$EXTRA_CFLAGS -DXNU_GUACMEDIA=1"
+  touch .cache/xnu-work/bsd/dev/sweet_ufs.c
   KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $GUAC_MEDIA_ARCHIVE"
   if [ "${XNU_TEST_NATIVEUFS:-0}" = 1 ]; then
     TEST_ARCHIVE=$ROOT/build/native-ufs/libNativeUfs.a

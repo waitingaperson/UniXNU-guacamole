@@ -1,0 +1,11 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -575,7 +575,7 @@
+ 
+ 	for (;;) {
+ 		for (int i = 0; i < 1000; i++) {
+-			thread_yield();
++			thread_yield_to_preemption();
+ 		}
+ 		sweet_stage_heartbeat(++beat);
+ 

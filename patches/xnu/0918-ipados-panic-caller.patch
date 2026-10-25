@@ -1,0 +1,20 @@
+--- a/osfmk/kern/debug.c
++++ b/osfmk/kern/debug.c
+@@ -1134,6 +1134,17 @@
+ {
+ #pragma clang diagnostic pop
+ 
++	/*
++	 * Guacamole: draw the panic call site in the framebuffer before any
++	 * console work. If the console path itself is wedged, this is the only
++	 * record of where the panic came from. The fault dump keeps the first
++	 * values it was given, so a fault panic still shows pc/lr/far/esr.
++	 */
++	{
++		extern void sweet_stage_faultdump(uint64_t, uint64_t, uint64_t, uint64_t);
++		sweet_stage_faultdump((uint64_t)panic_caller, 0, 0, 0);
++	}
++
+ #if defined(__x86_64__) && (DEVELOPMENT || DEBUG)
+ 	read_lbr();
+ #endif

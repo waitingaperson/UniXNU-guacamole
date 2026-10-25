@@ -11,6 +11,9 @@
 #include <kern/debug.h>
 
 extern "C" int sweet_ufs_media_read(uint64_t off, void *dst, uint64_t len);
+uint64_t guac_media_report[3] = {
+	0xdead0000ULL, 0, 0
+};
 extern "C" uint64_t sweet_ufs_media_bytes(void);
 extern "C" uint32_t sweet_ufs_media_block_size(void);
 
@@ -223,7 +226,9 @@ guac_ufs_media_publish(void)
 		if (matching != nullptr) {
 			matching->release();
 		}
-		sweet_stage_field(count, name, size, 0x47554d45ULL);
+		guac_media_report[0] = count;
+		guac_media_report[1] = name;
+		guac_media_report[2] = size;
 	}
 	return 0;
 }

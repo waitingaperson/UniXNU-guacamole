@@ -1,0 +1,16 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -574,11 +574,8 @@
+ 	extern void sweet_stage_heartbeat(uint64_t value);
+ 
+ 	for (;;) {
+-		volatile uint64_t spin = 0;
+-
+-		while (spin < 40000000ULL) {
+-			spin++;
+-			__asm__ volatile ("yield" ::: "memory");
++		for (int i = 0; i < 1000; i++) {
++			thread_yield();
+ 		}
+ 		sweet_stage_heartbeat(++beat);
+ 

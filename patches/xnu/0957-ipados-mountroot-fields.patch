@@ -1,0 +1,30 @@
+--- a/bsd/vfs/vfs_subr.c
++++ b/bsd/vfs/vfs_subr.c
+@@ -1243,6 +1243,9 @@
+ 		KDBG_RELEASE(DBG_MOUNTROOT | DBG_FUNC_END, error, 1);
+ 		return error;
+ 	}
++	extern void sweet_stage_field(uint64_t, uint64_t, uint64_t, uint64_t);
++	uint32_t sweet_err_apfs = 0xdead, sweet_err_hfs = 0xbeef;
++	uint32_t sweet_err_other = 0;
+ 	/*
+ 	 * 4951998 - code we call in vfc_mountroot may replace rootvp
+ 	 * so keep a local copy for some house keeping.
+@@ -1263,6 +1266,17 @@
+ 		} else {
+ 			error = VFS_MOUNT(mp, rootvp, 0, ctx);
+ 		}
++		if (error != 0) {
++			if (vfsp->vfc_name && strcmp(vfsp->vfc_name, "apfs") == 0) {
++				sweet_err_apfs = (uint32_t)error;
++			} else if (vfsp->vfc_name && strcmp(vfsp->vfc_name, "hfs") == 0) {
++				sweet_err_hfs = (uint32_t)error;
++			} else {
++				sweet_err_other++;
++			}
++		}
++		sweet_stage_field(sweet_err_apfs, sweet_err_hfs,
++		    (uint64_t)rootvp->v_specsize, sweet_err_other);
+ 
+ 		if (!error) {
+ 			if (bdevvp_rootvp != rootvp) {

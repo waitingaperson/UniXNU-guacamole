@@ -1,0 +1,38 @@
+--- a/bsd/dev/sweet_ufs.c
++++ b/bsd/dev/sweet_ufs.c
+@@ -474,6 +474,7 @@
+ uint64_t sweet_ufs_reads;
+ /* Last three block numbers handed to the device, oldest first. */
+ uint64_t sweet_ufs_last[3];
++uint64_t sweet_ufs_lasterr;
+ 
+ static void
+ sweet_ufs_strategy(buf_t bp)
+@@ -519,6 +520,9 @@
+ 		uint32_t want = MIN(count - done, BOUNCE_SIZE - skip);
+ 		uint32_t blocks = (skip + want + UFS_BLOCK - 1) / UFS_BLOCK;
+ 		void *bounce = (void *)(su.dma + DMA_BOUNCE);
++		sweet_ufs_last[0] = sweet_ufs_last[1];
++		sweet_ufs_last[1] = sweet_ufs_last[2];
++		sweet_ufs_last[2] = lba;
+ 		if (rd) {
+ 			error = ufs_read_blocks(su.first_block + lba, blocks);
+ 			if (!error) {
+@@ -527,9 +531,6 @@
+ 					dma_copy_from(DMA_BOUNCE + 0xf0, &sweet_ufs_diag[1], 8);
+ 				}
+ 				sweet_ufs_reads++;
+-				sweet_ufs_last[0] = sweet_ufs_last[1];
+-				sweet_ufs_last[1] = sweet_ufs_last[2];
+-				sweet_ufs_last[2] = lba;
+ 				if (lba == 0 && skip == 0 && want >= 64) {
+ 					uint64_t w[6];
+ 					extern void sweet_stage_field(uint64_t, uint64_t,
+@@ -567,6 +568,7 @@
+ 
+ done:
+ 	if (error) {
++		sweet_ufs_lasterr = (uint64_t)(uint32_t)error;
+ 		buf_seterror(bp, error);
+ 	}
+ 	buf_biodone(bp);

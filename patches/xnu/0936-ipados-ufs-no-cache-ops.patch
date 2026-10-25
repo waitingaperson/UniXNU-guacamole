@@ -1,0 +1,39 @@
+--- a/bsd/dev/sweet_ufs.c
++++ b/bsd/dev/sweet_ufs.c
+@@ -107,6 +107,7 @@
+ 	int bmajor, cmajor;
+ 	dev_t bdev;
+ 	bool dma_ready;
++	bool dma_uncached;                      /* device-mapped window: no cache ops */
+ 	bool ready;
+ } su;
+ 
+@@ -128,12 +129,20 @@
+ static void
+ dma_sync(uint32_t off, uint32_t len)
+ {
++	if (su.dma_uncached) {
++		__builtin_arm_dsb(0xf);
++		return;
++	}
+ 	flush_dcache64((addr64_t)(su.dma_pa + off), len, TRUE);
+ }
+ 
+ static void
+ dma_clean(uint32_t off, uint32_t len)
+ {
++	if (su.dma_uncached) {
++		__builtin_arm_dsb(0xf);
++		return;
++	}
+ 	clean_dcache64((addr64_t)(su.dma_pa + off), len, TRUE);
+ }
+ 
+@@ -660,6 +669,7 @@
+ 	    reg[0] < 0x100000000ULL && reg[1] >= DMA_SIZE) {
+ 		su.dma = ml_io_map(reg[0], reg[1]);
+ 		su.dma_pa = reg[0];
++		su.dma_uncached = TRUE;
+ 		dma_clear(0, (size_t)reg[1]);
+ 		su.dma_ready = TRUE;
+ 		printf("SWEET UFS: DMA from device tree pa=%llx va=%llx\n",

@@ -1,0 +1,26 @@
+--- a/bsd/dev/sweet_ufs.c
++++ b/bsd/dev/sweet_ufs.c
+@@ -468,6 +468,8 @@
+ 	return 0;
+ }
+ 
++static int sweet_ufs_ios;
++
+ static void
+ sweet_ufs_strategy(buf_t bp)
+ {
+@@ -479,6 +481,14 @@
+ 
+ 	bool rd = buf_flags(bp) & B_READ;
+ 
++	if (sweet_ufs_ios < 12) {
++		printf("SWEET UFS io #%d %s off=%llu len=%u first=%llx\n",
++		    sweet_ufs_ios, rd ? "read" : "write",
++		    (unsigned long long)off, count,
++		    (unsigned long long)su.first_block);
++		sweet_ufs_ios++;
++	}
++
+ 	buf_setresid(bp, count);
+ 	if (!rd && !su.writable) {
+ 		error = EROFS;

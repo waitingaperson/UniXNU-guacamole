@@ -7,7 +7,7 @@ per-board profile).
 
 Usage:  mkadt.py OUT.adt [--device sweet|guacamole] [--dump] [--qemu] [--highmem]
 """
-import hashlib, os, struct, sys
+import hashlib, os, struct, sys, zlib
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import adt      # noqa: E402
@@ -71,6 +71,28 @@ def ipad_product(dev):
     ]
 
 
+def empty_nvram_proxy():
+    """A fresh volatile CHRP bank for IODTNVRAM, with no controller (sheng format)."""
+    def header(name, size):
+        raw = bytearray(struct.pack('<BBH12s', 0x70, 0, size // 16, name))
+        checksum = sum(raw)
+        while checksum > 255:
+            checksum = (checksum & 255) + (checksum >> 8)
+        raw[1] = checksum
+        return raw
+
+    image = bytearray(8192)
+    image[:16] = header(b'nvram', 32)
+    image[32:48] = header(b'common', 16 + 2048)
+    free_at = 32 + 16 + 2048
+    image[free_at:free_at + 16] = header(b'free', len(image) - free_at)
+    struct.pack_into('<I', image, 16, zlib.adler32(image[20:]))
+    return [('nvram-bank-size', struct.pack('<I', len(image))),
+            ('nvram-bank-count', struct.pack('<I', 1)),
+            ('nvram-current-bank', struct.pack('<I', 0)),
+            ('nvram-proxy-data', bytes(image))]
+
+
 def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
           owned_memory_size=None, ipad_identity=False, root_match_uuid=None,
           ipad_chip_id=0x207):
@@ -106,11 +128,9 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
         ('dram-size', u64(mem_size)),
         *([('darwinboot-memory-size', u64(owned_memory_size))] if owned_memory_size else []),
         ('embedded-panic-log-size', u32(dev.get('panic_size', 0x80000))),
-        # IODTNVRAM picks its CHRP/V3 handler from these /chosen properties;
-        # without them the platform expert panics in initImageFormat().
-        ('nvram-bank-size', u32(0x2000)),
-        ('nvram-bank-count', u32(2)),
-        ('nvram-current-bank', u32(0)),
+        # ArmDTPlatform::start requires a usable CHRP NVRAM proxy here, and
+        # IODTNVRAM picks its handler from these /chosen properties.
+        *empty_nvram_proxy(),
         ('random-seed', seed),
         ('debug-enabled', u32(1)),
         ('firmware-version', cstr('sweet-shim')),
@@ -170,13 +190,14 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
             ('cluster-id', u32(0)),  # descriptive; see ml_parse_cpu_topology
             # AppleARMCPU validates cluster-type as the 'E'/'P' value; all cores as
             # one P cluster keeps a single cluster type for the native SMP port.
-            ('cluster-type', u32(0x50)),
-            ('reg-private', u64(0)),
-            ('l2-access-penalty', u32(0)),
-            ('l2-cache-size', u32(0x1000)),
-            ('l3-cache-size', u32(0x8000)),
-            ('no-aic-ipi-required', u32(1)),
-            ('interrupts', u32(0x40 + core, 0, 0x41 + core)),
+            *([('cluster-type', u32(0x50)),
+               ('reg-private', u64(0)),
+               ('l2-access-penalty', u32(0)),
+               ('l2-cache-size', u32(0x1000)),
+               ('l3-cache-size', u32(0x8000)),
+               ('no-aic-ipi-required', u32(1)),
+               ('interrupts', u32(0x40 + core, 0, 0x41 + core))]
+              if os.environ.get('GUAC_APPLE_CPU_PROPS', '0') == '1' else []),
             ('die-cluster-id', u32(0)),
             ('cluster-core-id', u32(core)),
             ('l2-cache-id', u32(core)),  # distinct per-core L2 nodes in live FDT
@@ -194,14 +215,16 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
 
     cpus = node('cpus', [ph(), ('#address-cells', u32(1)),
                          ('#size-cells', u32(0)),
-                         ('max_cpus', u32(len(cpu_nodes)))], cpu_nodes)
+                         *([('max_cpus', u32(len(cpu_nodes)))] if os.environ.get('GUAC_APPLE_CPU_PROPS', '0') == '1' else [])], cpu_nodes)
 
     # AppleARMCPU validates the CPU configuration against the platform's CPU
     # start conduit; sheng's working ADT publishes /psci, guacamole's did not.
     psci = None if qemu else node('psci', [ph(), ('compatible', cstr('arm,psci-1.0')),
                                             ('method', cstr('smc'))])
 
-    gic = node('gic', [
+    # ArmCpu maps the redistributor through /arm-io/intc (sheng's node name);
+    # pe_fiq's /arm-io/gic lookup failing is non-fatal on this port.
+    gic = node('intc', [
         ph(),
         ('compatible', cstr('arm,gic-v3')),
         ('interrupt-controller', b''),
@@ -278,20 +301,23 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
     # SweetPlatformExpert matching and for the live FDT audits.
     if ipad_identity:
         identity = [
-            ('compatible', cstr('J120AP') + cstr('iPad7,1') + cstr(dev['board_compat']) + cstr(dev['soc_compat']) + cstr('AppleARM')),
+            ('compatible', cstr('J120AP') + cstr('iPad7,1') + cstr(dev['board_compat']) + cstr(dev['soc_compat'])),
             ('model', cstr('iPad7,1')),
             ('target-type', cstr('J120')),
             ('target-sub-type', cstr('J120AP')),
         ]
     else:
         identity = [
-            ('compatible', cstr('D22AP') + cstr('iPhone10,3') + cstr(dev['board_compat']) + cstr(dev['soc_compat']) + cstr('AppleARM')),
+            ('compatible', cstr('D22AP') + cstr('iPhone10,3') + cstr(dev['board_compat']) + cstr(dev['soc_compat'])),
             ('model', cstr('iPhone10,3')),
             ('target-type', cstr('D22')),
             ('target-sub-type', cstr('D22AP')),
         ]
 
     pram = node('pram', [ph(), ('reg', u64(dev['panic'], dev.get('panic_size', 0x80000)))])
+    # Fixed low DRAM window for the UFS DMA buffers: the kernel-managed range
+    # starts above 4 GiB and kmem_alloc_contig can sleep forever there.
+    ufs_dma = node('ufs-dma', [ph(), ('reg', u64(dev['ufs_dma'], dev.get('ufs_dma_size', 0x20000)))])
 
     return node('device-tree', [
         ph(),
@@ -299,7 +325,7 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
         ('manufacturer', cstr('Apple Inc.')),
         ('#address-cells', u32(2)),
         ('#size-cells', u32(2)),
-    ], [chosen, options, defaults, cpus] + ([psci] if psci is not None else []) + [arm_io, fbcon, buttons, pram] + product + ([] if qemu else [ufs]))
+    ], [chosen, options, defaults, cpus] + ([psci] if psci is not None else []) + [arm_io, fbcon, buttons, pram, ufs_dma] + product + ([] if qemu else [ufs]))
 
 
 if __name__ == '__main__':

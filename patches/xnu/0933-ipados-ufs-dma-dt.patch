@@ -1,0 +1,35 @@
+--- a/bsd/dev/sweet_ufs.c
++++ b/bsd/dev/sweet_ufs.c
+@@ -587,11 +587,32 @@
+ void
+ sweet_ufs_early_alloc(void)
+ {
++	DTEntry node;
++	uintptr_t const *reg = NULL;
++	unsigned int size = 0;
+ 	ppnum_t pn;
+ 
+ 	if (su.dma_ready) {
+ 		return;
+ 	}
++	/*
++	 * Preferred: the fixed low DRAM window declared by the device tree.
++	 * The kernel-managed range starts at the kernel window (above 4 GiB),
++	 * and kmem_alloc_contig sleeps forever when it cannot find a
++	 * contiguous run there.
++	 */
++	if (SecureDTLookupEntry(NULL, "/ufs-dma", &node) == kSuccess &&
++	    SecureDTGetProperty(node, "reg", (void const **)&reg, &size) == kSuccess &&
++	    size >= 2 * sizeof(uintptr_t) && reg[0] != 0 &&
++	    reg[0] < 0x100000000ULL && reg[1] >= DMA_SIZE) {
++		su.dma = ml_io_map(reg[0], reg[1]);
++		su.dma_pa = reg[0];
++		bzero((void *)su.dma, (size_t)reg[1]);
++		su.dma_ready = TRUE;
++		printf("SWEET UFS: DMA from device tree pa=%llx va=%llx\n",
++		    su.dma_pa, (unsigned long long)su.dma);
++		return;
++	}
+ 	if (kmem_alloc_contig(kernel_map, &su.dma, DMA_SIZE, PAGE_MASK, 0, 0,
+ 	    KMA_DATA | KMA_ZERO | KMA_PERMANENT, VM_KERN_MEMORY_IOKIT) != KERN_SUCCESS) {
+ 		printf("SWEET UFS: early DMA allocation failed\n");

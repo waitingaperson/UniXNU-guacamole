@@ -41,6 +41,8 @@ DEVICES = {
         # reserved-memory cont_splash_region that ABL leaves lit.
         'panic': 0x9e400000,
         'panic_size': 0x80000,
+        'ufs_dma': 0x9e500000,
+        'ufs_dma_size': 0x20000,
         'fb': 0x9c000000,
         'fb_size': 0x1700000,
         'fb_w': 1080,
@@ -90,6 +92,8 @@ DEVICES = {
         'fb': 0x9c000000,
         'panic': 0x9e400000,
         'panic_size': 0x80000,
+        'ufs_dma': 0x9e500000,
+        'ufs_dma_size': 0x20000,
         'fb_size': 0x2400000,
         'fb_w': 1440,
         'fb_h': 3120,

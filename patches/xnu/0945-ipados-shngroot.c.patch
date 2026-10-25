@@ -1,0 +1,70 @@
+--- a/bsd/dev/sweet_ufs.c
++++ b/bsd/dev/sweet_ufs.c
+@@ -707,6 +707,57 @@
+ 	su.dma_ready = TRUE;
+ }
+ 
++/*
++ * The UniXNU userdata image starts with a 4 KiB SHNGROOT manifest that
++ * describes MiB-aligned disk-image windows (OS, SystemOS). When present, the
++ * root block device is the OS window; otherwise the whole GPT partition is
++ * used as before.
++ */
++#define SHNG_MAGIC "SHNGROOT"
++
++static int
++sweet_ufs_shngroot(void)
++{
++	uint8_t magic[8];
++	uint32_t version = 0, count = 0;
++	uint64_t image_bytes = 0, offset = 0, size = 0;
++	char name[33];
++	int error;
++
++	error = ufs_read_blocks(su.first_block, 1);
++	if (error != 0) {
++		return error;
++	}
++	dma_copy_from(DMA_BOUNCE, magic, sizeof(magic));
++	if (memcmp(magic, SHNG_MAGIC, sizeof(magic)) != 0) {
++		return 0;
++	}
++	dma_copy_from(DMA_BOUNCE + 8, &version, sizeof(version));
++	dma_copy_from(DMA_BOUNCE + 12, &count, sizeof(count));
++	dma_copy_from(DMA_BOUNCE + 16, &image_bytes, sizeof(image_bytes));
++	if (version != 1 || count == 0 || count > 4) {
++		printf("SWEET UFS: SHNGROOT header invalid (v%u, %u windows)\n",
++		    version, count);
++		return EINVAL;
++	}
++	dma_copy_from(DMA_BOUNCE + 24, name, 32);
++	name[32] = 0;
++	dma_copy_from(DMA_BOUNCE + 24 + 32, &offset, sizeof(offset));
++	dma_copy_from(DMA_BOUNCE + 24 + 40, &size, sizeof(size));
++	if (size == 0 || offset >= image_bytes ||
++	    (offset % UFS_BLOCK) != 0 || (size % UFS_BLOCK) != 0 ||
++	    offset + size > (uint64_t)su.nblocks * UFS_BLOCK) {
++		printf("SWEET UFS: SHNGROOT window \"%s\" outside the partition\n", name);
++		return EINVAL;
++	}
++	printf("SWEET UFS: SHNGROOT \"%s\" offset %llu size %llu of %llu\n",
++	    name, (unsigned long long)offset, (unsigned long long)size,
++	    (unsigned long long)image_bytes);
++	su.first_block += offset / UFS_BLOCK;
++	su.nblocks = size / UFS_BLOCK;
++	return 0;
++}
++
+ static int
+ sweet_ufs_init(void)
+ {
+@@ -753,6 +804,9 @@
+ 	if (!error) {
+ 		error = ufs_find_partition(want);
+ 	}
++	if (!error) {
++		error = sweet_ufs_shngroot();
++	}
+ 	lck_mtx_unlock(&sweet_ufs_lock);
+ 	if (error) {
+ 		return error;

@@ -25,6 +25,11 @@ python3 unixnu/kits/NativePrelink/emit_prelink.py \
   --output "$OUT" \
   "${roots[@]}"
 
+# The restore volume is unsealed and has no root snapshot; the only bootable
+# root is the live filesystem, which APFS's release policy refuses to
+# authenticate. Disable that single decision in the prelinked kext.
+python3 scripts/patch-apfs-rootauth.py "$OUT"
+
 ./unixnu/unixnu build payload --kernel "$OUT" --unique-chip-id 0x5357454554000001 -D .
 
 python3 scripts/build-bootimg.py \

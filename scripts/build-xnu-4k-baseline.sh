@@ -667,6 +667,15 @@ if [ "${XNU_SOURCE_CORECRYPTO14:-0}" = 1 ] && [ "$BOOTSTRAP" = 0 ]; then
   EXTRA_CFLAGS="$EXTRA_CFLAGS -DXNU_GUACMEDIA=1"
   touch .cache/xnu-work/bsd/dev/sweet_ufs.c
   KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $GUAC_MEDIA_ARCHIVE"
+  # The root window as an IOBlockStorageDevice, so IOStorageFamily publishes
+  # the IOMedia that APFS's mount root requires.
+  python3 scripts/build-arm-driver.py GuacUfsMedia
+  GUAC_UFS_MEDIA_ARCHIVE=$ROOT/build/guac-ufs-media/libGuacUfsMedia.a
+  test -f "$GUAC_UFS_MEDIA_ARCHIVE"
+  $CROSS_CLANG -c -target arm64-apple-ios17.0 scripts/data/native-storage-bindings.S \
+    -o "$ROOT/build/guac-ufs-media/native-storage-bindings.o"
+  KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES $ROOT/build/guac-ufs-media/native-storage-bindings.o -Wl,-force_load,$GUAC_UFS_MEDIA_ARCHIVE"
+  KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $GUAC_UFS_MEDIA_ARCHIVE"
   if [ "${XNU_TEST_NATIVEUFS:-0}" = 1 ]; then
     TEST_ARCHIVE=$ROOT/build/native-ufs/libNativeUfs.a
     test -f "$TEST_ARCHIVE"
@@ -808,6 +817,7 @@ PY_BINDINGS
     KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $ROOT/build/boot-progress/libBootProgress.a"
   fi
   KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES ${XNU_EXTRA_LD_ARCHIVES:-}"
+  echo "DEBUG-ARCHIVES=[$KERNEL_EXTRA_ARCHIVES]" >&2
   EXTRA_MAKE_ARGS+=("LD_KERNEL_ARCHIVES=$KERNEL_EXTRA_ARCHIVES")
   EXTRA_MAKE_ARGS+=("XNU_EXTERNAL_KERNEL_ARCHIVES=$KERNEL_ARCHIVE_DEPENDENCIES")
 fi

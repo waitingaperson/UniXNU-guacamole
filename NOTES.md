@@ -346,3 +346,54 @@ gadget is not usable for control.
   FAT. The 32 MiB FAT32 was the last blocker; the earlier DTB pointer,
   ramdisk address, and FatDxe/PartitionDxe fixes were all required, but the
   invalid FAT32 cluster count was what kept the volume from mounting.
+
+## 2026-10-25: iPadOS 17 bring-up from the XNU source kernel
+
+Local Linux pipeline works: `scripts/linux/setup-toolchain.py` plus
+`scripts/build-local-linux.sh` build the 4 KiB BCM2837 kernel (two XNU passes,
+board archives, prelink, payload, boot image) in about 30 seconds per change.
+Diagnostics that made the bring-up possible:
+
+- `0904/0906/0907`: the panic saved state is drawn as large hex digits in the
+  framebuffer (pc/lr/far/esr) through an `ml_io_map` window; the first fault of
+  a boot wins, so nested panics do not overwrite it.
+- `0914-0929`: a low-priority heartbeat thread redraws a counter and walks the
+  blocked boot thread's kernel stack (frame pointers) into the framebuffer.
+- `0941`: a wedged `vcputc_lock` is taken over instead of waited on, which
+  restored the kernel console after the first kext starts.
+
+Boot progression reached today (2026-10-25): XNU -> IOKit kexts -> MAC
+policies (AppleImage4, AMFI, Sandbox, vnguard) -> `bsd_init` -> `dlil_init` ->
+`setconf` -> the built-in SM8150 UFS driver -> HFS root mount -> first
+`posix_spawn` of launchd (stalls with the iOS 16 userland from the r15 chain).
+
+Findings and fixes:
+
+- The "Unexpected fault in kernel static region" panic was our own diagnostic
+  writing past the 2 MiB framebuffer V=P map; the marker/dump path now uses an
+  `ml_io_map` window and a console-free strip.
+- CoreTrust writes lazily initialized `__const` state during start; kext and
+  kernel `__DATA_CONST` stay writable for the bring-up kernel (`0908`-`0910`).
+- `MAC policy init failed: 1` was EPERM from `mac_policy_register` after
+  `mac_late`: the `guac_skip_sec_ext` boot argument skipped the early security
+  extension load, so AMFI/Image4 policies registered late. Removing it fixed
+  the policy ordering.
+- `kmem_alloc_contig` sleeps forever on this port (the kernel-managed range
+  starts above 4 GiB and no contiguous run is available). The UFS DMA buffer
+  now comes from a device-tree window (`ufs-dma`, PA 0x9e500000, 2 MiB),
+  accessed byte-wise because the mapping is device memory (`0931`-`0936`).
+- The SM8150 UFS driver reads the GPT, finds "userdata", and (with `0945`,
+  `0946`) parses the SHNGROOT manifest written by
+  `scripts/build-userdata-shngroot.py`: the OS window is exposed as
+  `ufsroot0` with its exact byte length.
+- iPadOS 17.7.11 userdata was rebuilt from the local IPSW with the APFS
+  partition of each disk image as a window, and flashed with
+  `fastboot flash userdata` (8.74 GiB).
+
+Current blocker: APFS `open` of the root volume fails with ENOENT before any
+block I/O. The container is exposed correctly (NXSB, nx_block_count matches the
+window exactly, and the ADT root-matching UUID is present in the volume
+superblock), so the failure is in APFS's root-vnode selection for the sealed
+system volume, not in the block device. The r15 chain avoided this by mounting
+an HFS+ root; a matching iPadOS 17 HFS+ root image (or the sealed-root snapshot
+metadata from iBoot) is the next step.

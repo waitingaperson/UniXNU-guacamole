@@ -1,0 +1,35 @@
+--- a/bsd/kern/kern_exec.c
++++ b/bsd/kern/kern_exec.c
+@@ -138,6 +138,11 @@
+ #include <kern/sched_prim.h> /* thread_wakeup() */
+ #include <kern/affinity.h>
+ #include <kern/assert.h>
++
++extern void sweet_stage_field(uint64_t, uint64_t, uint64_t, uint64_t);
++#define SWEET_STAGE(n) sweet_stage_field((uint64_t)(n), 0, 0x53544745ULL, 0)
++#define SWEET_STAGE_ERR(n, e) sweet_stage_field((uint64_t)(n), (uint64_t)(uint32_t)(e), 0x53544745ULL, 0)
++
+ #include <kern/task.h>
+ #include <kern/thread.h>
+ #include <kern/coalition.h>
+@@ -8091,16 +8096,20 @@
+ #endif
+ 
+ 	error = ENOENT;
++	SWEET_STAGE(60);
+ 	for (i = 0; i < sizeof(init_programs) / sizeof(init_programs[0]); i++) {
+ 		printf("load_init_program: attempting to load %s\n", init_programs[i]);
++		SWEET_STAGE(61);
+ 		error = load_init_program_at_path(p, (user_addr_t)scratch_addr, init_programs[i], init_envp);
+ 		if (!error) {
+ 			return;
+ 		} else if (error != ENOENT) {
+ 			printf("load_init_program: failed loading %s: errno %d\n", init_programs[i], error);
++			SWEET_STAGE_ERR(80, error);
+ 		}
+ 	}
+ 
++	SWEET_STAGE_ERR(90, error);
+ 	panic("Process 1 exec of %s failed, errno %d", ((i == 0) ? "<null>" : init_programs[i - 1]), error);
+ }
+ 

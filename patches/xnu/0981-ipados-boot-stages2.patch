@@ -1,0 +1,42 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -1171,6 +1171,7 @@
+ #endif
+ 		}
+ 	}
++	SWEET_STAGE(41);
+ 
+ 
+ #if CONFIG_NETBOOT
+@@ -1292,6 +1293,7 @@
+ #endif /* DEVELOPMENT || DEBUG */
+ 
+ 	bsd_init_kprintf("done\n");
++	SWEET_STAGE(42);
+ }
+ 
+ #if defined(XNU_OWNER_ROOT_AUDIT) && XNU_OWNER_ROOT_AUDIT
+@@ -1326,6 +1328,7 @@
+ 	proc_t p = current_proc();
+ 
+ 	process_name("init", p);
++	SWEET_STAGE(45);
+ 
+ 	/* Set up exception-to-signal reflection */
+ 	ux_handler_setup();
+@@ -1335,6 +1338,7 @@
+ #endif
+ 
+ 	vm_init_before_launchd();
++	SWEET_STAGE(46);
+ 
+ #if CONFIG_XNUPOST
+ 	int result = bsd_list_tests();
+@@ -1346,6 +1350,7 @@
+ 
+ 	bsd_init_kprintf("bsd_do_post - done");
+ 
++	SWEET_STAGE(47);
+ 	SWEET_STAGE(50);
+ 	load_init_program(p);
+ 	lock_trace = 1;

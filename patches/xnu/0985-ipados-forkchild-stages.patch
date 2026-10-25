@@ -1,0 +1,34 @@
+--- a/bsd/kern/kern_fork.c
++++ b/bsd/kern/kern_fork.c
+@@ -468,6 +468,7 @@
+ 	 * Create a new task for the child process, IPC access to the new task will
+ 	 * be set up after task has been fully initialized.
+ 	 */
++	SWEET_STAGE(94);
+ 	result = task_create_internal(parent_task,
+ 	    proc_ro,
+ 	    parent_coalitions,
+@@ -485,6 +486,7 @@
+ 		goto bad;
+ 	}
+ 
++	SWEET_STAGE(95);
+ 	/* Set the child proc process to child task */
+ 	proc_set_task(child_proc, child_task);
+ 
+@@ -510,6 +512,7 @@
+ 	 *
+ 	 * The new thread is waiting on the event triggered by 'task_clear_return_wait'
+ 	 */
++	SWEET_STAGE(96);
+ 	result = main_thread_create_waiting(child_task,
+ 	    (thread_continue_t)task_wait_to_return,
+ 	    task_get_return_wait_event(child_task),
+@@ -528,6 +531,7 @@
+ 	thread_set_tag(child_thread, THREAD_TAG_MAINTHREAD);
+ 
+ bad:
++	SWEET_STAGE(97);
+ 	thread_yield_internal(1);
+ 
+ 	return child_thread;

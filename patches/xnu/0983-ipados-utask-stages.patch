@@ -1,0 +1,42 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -1440,10 +1440,13 @@
+ 	 * Clone the bootstrap process from the kernel process, without
+ 	 * inheriting either task characteristics or memory from the kernel;
+ 	 */
++	SWEET_STAGE(80);
+ 	thread = cloneproc(TASK_NULL, NULL, kernproc, CLONEPROC_INITPROC);
++	SWEET_STAGE(81);
+ 
+ 	/* Hold the reference as it will be dropped during shutdown */
+ 	initproc = proc_find(1);
++	SWEET_STAGE(82);
+ #if __PROC_INTERNAL_DEBUG
+ 	if (initproc == PROC_NULL) {
+ 		panic("bsd_utaskbootstrap: initproc not set");
+@@ -1451,6 +1454,7 @@
+ #endif
+ 
+ 	zalloc_first_proc_made();
++	SWEET_STAGE(83);
+ 
+ 	/*
+ 	 * Since we aren't going back out the normal way to our parent,
+@@ -1458,14 +1462,17 @@
+ 	 */
+ 	proc_signalend(initproc, 0);
+ 	proc_transend(initproc, 0);
++	SWEET_STAGE(84);
+ 
+ 	ut = (struct uthread *)get_bsdthread_info(thread);
+ 	ut->uu_sigmask = 0;
+ 	act_set_astbsd(thread);
+ 
+ 	ipc_task_enable(get_threadtask(thread));
++	SWEET_STAGE(85);
+ 
+ 	task_clear_return_wait(get_threadtask(thread), TCRW_CLEAR_ALL_WAIT);
++	SWEET_STAGE(86);
+ }
+ 
+ static void

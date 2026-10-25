@@ -1,0 +1,37 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -1211,6 +1211,7 @@
+ 		IOSetImageBoot();
+ 	}
+ 
++	SWEET_STAGE(70);
+ #endif /* CONFIG_IMAGEBOOT */
+ 
+ 	/* set initial time; all other resource data is  already zero'ed */
+@@ -1223,6 +1224,7 @@
+ 		bsd_init_kprintf("calling devfs_kernel_mount\n");
+ 		devfs_kernel_mount(mounthere);
+ 	}
++	SWEET_STAGE(71);
+ #endif /* DEVFS */
+ 
+ #if CONFIG_BASESYSTEMROOT
+@@ -1262,14 +1264,18 @@
+ #endif /* CONFIG_IMAGEBOOT */
+ #endif /* CONFIG_BASESYSTEMROOT */
+ 
++	SWEET_STAGE(72);
+ 	/* Initialize signal state for process 0. */
+ 	bsd_init_kprintf("calling siginit\n");
+ 	siginit(kernproc);
++	SWEET_STAGE(73);
+ 
+ 	bsd_init_kprintf("calling bsd_utaskbootstrap\n");
+ 	bsd_utaskbootstrap();
++	SWEET_STAGE(74);
+ 
+ 	pal_kernel_announce();
++	SWEET_STAGE(75);
+ 
+ 	bsd_init_kprintf("calling mountroot_post_hook\n");
+ 

@@ -1,0 +1,10 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -1346,6 +1346,7 @@
+ 
+ 	bsd_init_kprintf("bsd_do_post - done");
+ 
++	SWEET_STAGE(50);
+ 	load_init_program(p);
+ 	lock_trace = 1;
+ }

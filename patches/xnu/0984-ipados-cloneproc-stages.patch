@@ -1,0 +1,52 @@
+--- a/bsd/kern/kern_fork.c
++++ b/bsd/kern/kern_fork.c
+@@ -79,6 +79,7 @@
+  */
+ 
+ #include <kern/assert.h>
++
+ #include <kern/bits.h>
+ #include <sys/param.h>
+ #include <sys/systm.h>
+@@ -674,6 +675,9 @@
+  *		live with this being somewhat awkward.
+  */
+ thread_t
++extern void sweet_stage_field(uint64_t, uint64_t, uint64_t, uint64_t);
++#define SWEET_STAGE(n) sweet_stage_field((uint64_t)(n), 0, 0x53544745ULL, 0)
++
+ cloneproc(task_t parent_task, coalition_t *parent_coalitions, proc_t parent_proc, cloneproc_flags_t clone_flags)
+ {
+ #if !CONFIG_MEMORYSTATUS
+@@ -685,6 +689,7 @@
+ 	bool cloning_initproc = !!(clone_flags & CLONEPROC_INITPROC);
+ 	bool in_exec = !!(clone_flags & CLONEPROC_EXEC);
+ 
++	SWEET_STAGE(90);
+ 	if ((child_proc = forkproc(parent_proc, clone_flags)) == NULL) {
+ 		/* Failed to allocate new process */
+ 		goto bad;
+@@ -703,6 +708,7 @@
+ 	const int parent_64bit_addr = parent_proc->p_flag & P_LP64;
+ 	const int parent_64bit_data = (parent_task == TASK_NULL) ? parent_64bit_addr : task_get_64bit_data(parent_task);
+ 
++	SWEET_STAGE(91);
+ 	child_thread = fork_create_child(parent_task,
+ 	    parent_coalitions,
+ 	    child_proc,
+@@ -710,6 +716,7 @@
+ 	    parent_64bit_data,
+ 	    clone_flags);
+ 
++	SWEET_STAGE(92);
+ 	if (child_thread == NULL) {
+ 		/*
+ 		 * Failed to create thread; now we must deconstruct the new
+@@ -742,6 +749,7 @@
+ 	}
+ #endif
+ 
++	SWEET_STAGE(93);
+ 	/* make child visible */
+ 	pinsertchild(parent_proc, child_proc, in_exec);
+ 

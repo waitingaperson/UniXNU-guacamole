@@ -66,8 +66,20 @@ for LATE_PATCH in "$ROOT/patches/xnu/zzz-boot-progress.patch" "$ROOT/patches/xnu
   fi
 done
 touch "$APPLIED_STAMP"
-for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.patch; do
-  PATCH_STAMP="$PATCH $(shasum -a 256 "$PATCH" | cut -d' ' -f1)"
+KIT_PATCH_DIR=
+if [ -d "$ROOT/kits/NativePrelink/patches" ]; then
+  KIT_PATCH_DIR=$ROOT/kits/NativePrelink/patches
+elif [ -d "$ROOT/unixnu/kits/NativePrelink/patches" ]; then
+  KIT_PATCH_DIR=$ROOT/unixnu/kits/NativePrelink/patches
+fi
+PATCH_STAMP_FILE=$ROOT/.cache/xnu-patch-stamp
+if command -v sha256sum >/dev/null 2>&1; then
+  FILE_HASH() { sha256sum "$1" | cut -d' ' -f1; }
+else
+  FILE_HASH() { shasum -a 256 "$1" | cut -d' ' -f1; }
+fi
+for PATCH in "$ROOT"/patches/xnu/*.patch ${KIT_PATCH_DIR:+"$KIT_PATCH_DIR"/*.patch}; do
+  PATCH_STAMP="$PATCH $(FILE_HASH "$PATCH")"
   if grep -qxF "$PATCH_STAMP" "$APPLIED_STAMP"; then
     continue
   fi
@@ -176,6 +188,9 @@ if [ ! -f "$KERNEL_SDKROOT/.xnu-$XNU_VERSION-headers" ]; then
 fi
 if [ ! -f "$KERNEL_SDKROOT/usr/local/lib/kernel/libfirehose_kernel.a" ]; then
   bash scripts/build-firehose.sh
+fi
+if [ "$(uname -s)" = Linux ]; then
+  python3 scripts/linux/prepare-xnu.py libs
 fi
 # The baseline builds the kernel; `all` also checks the Apple kext export ABI.
 EXTRA_MAKE_ARGS=()

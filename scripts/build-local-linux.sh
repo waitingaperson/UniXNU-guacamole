@@ -1,10 +1,10 @@
 #!/bin/sh
-# Local Linux build of the guacamole kernel: the CI's two XNU passes, the board
-# archives, the prelink and the payload, using the toolchain of
-# scripts/linux/setup-toolchain.py.
+# Local Linux build of the guacamole kernel: the CI's merged tree (UniXNU +
+# this device repo), the two XNU passes, the prelink and the payload, using the
+# toolchain of scripts/linux/setup-toolchain.py.
 set -eu
-ROOT=$(cd "$(dirname "$0")/.." && pwd)
-cd "$ROOT"
+REPO=$(cd "$(dirname "$0")/.." && pwd)
+cd "$REPO"
 TOOLCHAIN=${UNIXNU_TOOLCHAIN:-/opt/unixnu-linux}
 CLT=$TOOLCHAIN/CommandLineTools/usr
 XCT=$TOOLCHAIN/XcodeDefault.xctoolchain/usr
@@ -14,19 +14,32 @@ done
 export PATH="$CLT/bin:$TOOLCHAIN/bin:$PATH"
 export LC_ALL=C CLT_PREFIX="$CLT" XCTOOLCHAIN_PREFIX="$XCT"
 export XNU_TOOLCHAIN_BIN="$CLT/bin $XCT/bin"
-export UNIXNU_SDKROOT="$ROOT/.cache/fakeroot" UNIXNU_SDK_VERSION=17.0
-export UNIXNU_PLATFORM_PATH="$ROOT/.cache/fakeroot/Platforms/iPhoneOS.platform"
+export UNIXNU_SDK_VERSION=17.0
 export CROSS_CLANG="$TOOLCHAIN/llvm/bin/clang" DARWIN_TRIPLE=arm64-apple-ios17.0
 export CROSS_EXTRA_FLAGS='-mllvm -disable-atexit-based-global-dtor-lowering'
 export CCC_OVERRIDE_OPTIONS='# +-Wno-missing-designated-field-initializers +-Wno-unused-but-set-global'
 export JOBS=${JOBS:-$(nproc)}
+# The tree the CI builds in: UniXNU, then this repo's files over it.
+TREE=$REPO/out/guacamole/tree
+mkdir -p "$TREE"
+if [ ! -f "$TREE/board.toml" ]; then
+  rsync -a --exclude .git --exclude out --exclude build --exclude .cache unixnu/ "$TREE/"
+fi
+rsync -a --exclude .git --exclude unixnu --exclude out --exclude build --exclude .cache \
+  --exclude refer --exclude 'boot-32-*.img' ./ "$TREE/"
+# Host-only helpers newer than the pinned driver (the CI's macOS tree keeps its own).
+rsync -a scripts/local-linux/ "$TREE/scripts/"
+export UNIXNU_SDKROOT="$TREE/.cache/fakeroot"
+export UNIXNU_PLATFORM_PATH="$TREE/.cache/fakeroot/Platforms/iPhoneOS.platform"
+export UNIXNU_ROOT="$REPO/unixnu"
 # CONFIG_XNU_* of the defconfig become XNU_* for the build script.
-eval "$(python3 - <<'PY'
-import shlex, tomllib
+eval "$(python3 - "$TREE" <<'PY'
+import shlex, sys, tomllib
 from pathlib import Path
-board = tomllib.loads(Path('board.toml').read_text())
+tree = Path(sys.argv[1])
+board = tomllib.loads((tree/'board.toml').read_text())
 name = board['kernel']['defconfig']
-for line in Path(f'configs/{name}').read_text().splitlines():
+for line in (tree/'configs'/name).read_text().splitlines():
     line = line.strip()
     if not line or line.startswith('#') or '=' not in line:
         continue
@@ -41,12 +54,12 @@ for line in Path(f'configs/{name}').read_text().splitlines():
     print(f'export {key[len("CONFIG_"):]}={shlex.quote(value)}')
 PY
 )"
-echo "toolchain: $TOOLCHAIN, jobs: $JOBS"
+echo "toolchain: $TOOLCHAIN, tree: $TREE, jobs: $JOBS"
+cd "$TREE"
 XNU_BOOTSTRAP=1 XNU_BOOT_PROGRESS=0 bash scripts/build-xnu-4k-baseline.sh
 bash scripts/build-xnu-4k-baseline.sh
-KERNEL=build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837.unstripped
-python3 scripts/build-ipados.sh "$KERNEL"
-python3 scripts/build-bootimg.py --fd uefi/Build/SurfaceDuo1Pkg/DEBUG_CLANGPDB/FV/SM8150_EFI.fd \
-  --dtb inputs/uefi-prebuilt/guacamole.dtb --ramdisk unixnu/out/guacamole/payload/payload.img \
-  -o out/guacamole/boot/boot-32-ipados-local.img
+KERNEL=$TREE/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837.unstripped
+cd "$REPO"
+bash scripts/build-ipados.sh "$KERNEL"
+cp -f out/guacamole/boot/boot-32-ipados-r3.img out/guacamole/boot/boot-32-ipados-local.img
 echo "image: out/guacamole/boot/boot-32-ipados-local.img"

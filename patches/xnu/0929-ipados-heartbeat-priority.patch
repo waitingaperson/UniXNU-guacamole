@@ -1,0 +1,22 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -573,9 +573,6 @@
+ 	uint64_t beat = 0;
+ 	extern void sweet_stage_heartbeat(uint64_t value);
+ 
+-	/* Run below the boot threads so sampling cannot starve them. */
+-	thread_set_priority(current_thread(), 1);
+-
+ 	for (;;) {
+ 		for (int i = 0; i < 2000; i++) {
+ 			thread_yield_to_preemption();
+@@ -624,7 +621,8 @@
+ 	{
+ 		extern void *sweet_heartbeat_thread(void *, wait_result_t);
+ 		thread_t heartbeat_thread = THREAD_NULL;
+-		if (kernel_thread_start(sweet_heartbeat_thread, NULL, &heartbeat_thread) == KERN_SUCCESS) {
++		if (kernel_thread_start_priority(sweet_heartbeat_thread, NULL, 1,
++		    &heartbeat_thread) == KERN_SUCCESS) {
+ 			thread_deallocate(heartbeat_thread);
+ 		}
+ 	}

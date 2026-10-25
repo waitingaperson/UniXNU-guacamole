@@ -1,0 +1,12 @@
+--- a/libkern/c++/OSKext.cpp
++++ b/libkern/c++/OSKext.cpp
+@@ -8448,7 +8448,9 @@
+ 
+ 	// Drop a log message so logd can grab the needed information to decode this kext
+ 	OSKextLogKextInfo(this, kmod_info->address, kmod_info->size, firehose_tracepoint_code_load);
++	kprintf("KEXT init %s\n", getIdentifierCString());
+ 	result = OSRuntimeInitializeCPP(this);
++	kprintf("KEXT init done %s -> 0x%x\n", getIdentifierCString(), result);
+ 	if (result == KERN_SUCCESS) {
+ 		kprintf("KEXT start %s\n", getIdentifierCString());
+ 		result = startfunc(kmod_info, kmodStartData);

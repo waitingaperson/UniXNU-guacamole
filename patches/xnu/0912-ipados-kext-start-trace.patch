@@ -1,0 +1,12 @@
+--- a/libkern/c++/OSKext.cpp
++++ b/libkern/c++/OSKext.cpp
+@@ -8450,7 +8450,9 @@
+ 	OSKextLogKextInfo(this, kmod_info->address, kmod_info->size, firehose_tracepoint_code_load);
+ 	result = OSRuntimeInitializeCPP(this);
+ 	if (result == KERN_SUCCESS) {
++		kprintf("KEXT start %s\n", getIdentifierCString());
+ 		result = startfunc(kmod_info, kmodStartData);
++		kprintf("KEXT done %s -> 0x%x\n", getIdentifierCString(), result);
+ 	}
+ 
+ 	/* An explicitly linked security initializer must run with its real

@@ -11,3 +11,7 @@ scripts/base-d22ap.adt
 __pycache__/
 
 /build-tree/
+
+# iosf reference clone and build artifacts
+refer/IOStorageFamily/
+build/

@@ -1,0 +1,47 @@
+--- a/bsd/vfs/vfs_subr.c
++++ b/bsd/vfs/vfs_subr.c
+@@ -1206,9 +1206,35 @@
+  */
+ extern int (*mountroot)(void);
+ 
++extern kern_return_t kernel_thread_start(void (*)(void *, wait_result_t), void *, thread_t *);
++extern void IOSleep(unsigned int);
++
++static volatile int sweet_mount_round;
++static volatile int sweet_mount_index;
++static volatile int sweet_mount_error = -1;
++
++static void
++sweet_mount_watchdog(void *, wait_result_t)
++{
++	IOSleep(15000);
++	panic("GUACMOUNT watchdog: round=%d index=%d error=%d",
++	    sweet_mount_round, sweet_mount_index, sweet_mount_error);
++}
++
+ int
+ vfs_mountroot(void)
+ {
++	{
++		static int sweet_watchdog_started;
++		if (!sweet_watchdog_started) {
++			thread_t thread = NULL;
++			sweet_watchdog_started = 1;
++			if (kernel_thread_start(sweet_mount_watchdog, NULL, &thread) == KERN_SUCCESS) {
++				thread_deallocate(thread);
++			}
++		}
++	}
++	sweet_mount_round++;
+ #if CONFIG_MACF
+ 	struct vnode *vp;
+ #endif
+@@ -1263,6 +1289,8 @@
+ 		} else {
+ 			error = VFS_MOUNT(mp, rootvp, 0, ctx);
+ 		}
++		sweet_mount_index = sweet_mount_index + 1;
++		sweet_mount_error = error;
+ 
+ 		if (!error) {
+ 			if (bdevvp_rootvp != rootvp) {

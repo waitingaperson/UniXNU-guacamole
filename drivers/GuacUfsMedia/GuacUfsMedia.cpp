@@ -188,33 +188,42 @@ guac_ufs_media_publish(void)
 	media->registerService(kIOServiceSynchronous);
 	printf("GUACMEDIA: registered\n");
 	{
-		/* Report what IOStorageFamily has published so far. */
-		OSDictionary *m;
-		OSIterator *it;
-		m = IOService::serviceMatching("IOMedia");
-		it = m ? IOService::getMatchingServices(m) : nullptr;
-		unsigned seen = 0;
-		while (it != nullptr && seen < 8) {
-			IOService *service = OSDynamicCast(IOService, it->getNextObject());
-			OSString *bsd;
-			OSNumber *size;
+		/*
+		 * The kernel console overwrites its last row, so park the answer in
+		 * the fixed framebuffer fields instead: media count, first BSD name
+		 * packed eight bytes per line, and its size.
+		 */
+		extern void sweet_stage_field(uint64_t, uint64_t, uint64_t, uint64_t);
+		OSDictionary *matching = IOService::serviceMatching("IOMedia");
+		OSIterator *iterator = matching ? IOService::getMatchingServices(matching) : nullptr;
+		uint64_t count = 0, name = 0, size = 0;
+		while (iterator != nullptr && count < 8) {
+			IOService *service = OSDynamicCast(IOService, iterator->getNextObject());
 			if (service == nullptr) {
 				break;
 			}
-			bsd = OSDynamicCast(OSString, service->getProperty("BSD Name"));
-			size = OSDynamicCast(OSNumber, service->getProperty("Size"));
-			printf("GUACMEDIA: media %s size=%llx\n",
-			    bsd ? bsd->getCStringNoCopy() : "-",
-			    size ? size->unsigned64BitValue() : 0ULL);
-			seen++;
+			if (count == 0) {
+				OSString *bsd = OSDynamicCast(OSString, service->getProperty("BSD Name"));
+				OSNumber *bytes = OSDynamicCast(OSNumber, service->getProperty("Size"));
+				if (bsd != nullptr) {
+					const char *text = bsd->getCStringNoCopy();
+					for (unsigned i = 0; i < 8 && text[i] != '\0'; i++) {
+						name = (name << 8) | (unsigned char)text[i];
+					}
+				}
+				if (bytes != nullptr) {
+					size = bytes->unsigned64BitValue();
+				}
+			}
+			count++;
 		}
-		if (it != nullptr) {
-			it->release();
+		if (iterator != nullptr) {
+			iterator->release();
 		}
-		if (m != nullptr) {
-			m->release();
+		if (matching != nullptr) {
+			matching->release();
 		}
-		printf("GUACMEDIA: %u media service(s)\n", seen);
+		sweet_stage_field(count, name, size, 0x47554d45ULL);
 	}
 	return 0;
 }

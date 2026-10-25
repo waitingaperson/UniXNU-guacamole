@@ -184,12 +184,13 @@ guac_ufs_media_publish(void)
 		media->release();
 		return -5;
 	}
+	printf("GUACMEDIA: attach done, registering\n");
 	media->registerService(kIOServiceSynchronous);
+	printf("GUACMEDIA: registered\n");
 	{
-		/* Let IOStorageFamily's driver match and report what now exists. */
+		/* Report what IOStorageFamily has published so far. */
 		OSDictionary *m;
 		OSIterator *it;
-		IOSleep(1000);
 		m = IOService::serviceMatching("IOMedia");
 		it = m ? IOService::getMatchingServices(m) : nullptr;
 		unsigned seen = 0;

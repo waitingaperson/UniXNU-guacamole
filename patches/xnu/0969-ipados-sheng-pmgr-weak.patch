@@ -1,0 +1,20 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -165,7 +165,16 @@
+ #include <net/remote_vif.h>             /* for rvi_init() */
+ #include <net/kctl_test.h>              /* for kctl_test_init() */
+ #include <netinet/kpi_ipfilter_var.h>   /* for ipfilter_init() */
+-#include <kern/assert.h>                /* for assert() */
++#include <kern/assert.h>
++
++#if defined(XNU_SHENG_PMGR) && XNU_SHENG_PMGR
++/* Bootstrap pass fallback; the explicit sheng PMGR archive wins when linked. */
++__attribute__((weak)) void
++sheng_pmgr_run(void)
++{
++}
++#endif
++                /* for assert() */
+ #include <sys/kern_overrides.h>         /* for init_system_override() */
+ #include <sys/lockf.h>                  /* for lf_init() */
+ #include <sys/fsctl.h>

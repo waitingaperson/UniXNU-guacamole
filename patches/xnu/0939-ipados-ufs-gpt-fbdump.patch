@@ -1,0 +1,18 @@
+--- a/bsd/dev/sweet_ufs.c
++++ b/bsd/dev/sweet_ufs.c
+@@ -401,7 +401,14 @@
+ 		su.nblocks = last - first + 1;
+ 		return 0;
+ 	}
+-	printf("SWEET UFS: no GPT partition named \"%s\"\n", want);
++	{
++		extern void sweet_stage_stackdump(uint64_t, uint64_t, uint64_t, uint64_t);
++		uint64_t n0 = 0, n1 = 0;
++
++		dma_copy_from(DMA_BOUNCE + 56, &n0, sizeof(n0));
++		dma_copy_from(DMA_BOUNCE + esz + 56, &n1, sizeof(n1));
++		sweet_stage_stackdump(((uint64_t)nent << 32) | esz, entry_lba, n0, n1);
++	}
+ 	return ENOENT;
+ }
+ 

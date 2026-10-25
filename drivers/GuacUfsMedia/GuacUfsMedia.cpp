@@ -185,5 +185,35 @@ guac_ufs_media_publish(void)
 		return -5;
 	}
 	media->registerService(kIOServiceSynchronous);
+	{
+		/* Let IOStorageFamily's driver match and report what now exists. */
+		OSDictionary *m;
+		OSIterator *it;
+		IOSleep(1000);
+		m = IOService::serviceMatching("IOMedia");
+		it = m ? IOService::getMatchingServices(m) : nullptr;
+		unsigned seen = 0;
+		while (it != nullptr && seen < 8) {
+			IOService *service = OSDynamicCast(IOService, it->getNextObject());
+			OSString *bsd;
+			OSNumber *size;
+			if (service == nullptr) {
+				break;
+			}
+			bsd = OSDynamicCast(OSString, service->getProperty("BSD Name"));
+			size = OSDynamicCast(OSNumber, service->getProperty("Size"));
+			printf("GUACMEDIA: media %s size=%llx\n",
+			    bsd ? bsd->getCStringNoCopy() : "-",
+			    size ? size->unsigned64BitValue() : 0ULL);
+			seen++;
+		}
+		if (it != nullptr) {
+			it->release();
+		}
+		if (m != nullptr) {
+			m->release();
+		}
+		printf("GUACMEDIA: %u media service(s)\n", seen);
+	}
 	return 0;
 }

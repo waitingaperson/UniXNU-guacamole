@@ -1,0 +1,38 @@
+--- a/osfmk/arm64/sweet_stage.c
++++ b/osfmk/arm64/sweet_stage.c
+@@ -243,3 +243,18 @@
+ 	sweet_stage_hexline(args, c, 2640);
+ 	sweet_stage_hexline(args, d, 2760);
+ }
++
++/* Four values in the upper strip, out of the heartbeat sampler's rows. */
++void
++sweet_stage_field(uint64_t a, uint64_t b, uint64_t c, uint64_t d)
++{
++	boot_args *args = sweet_stage_args;
++
++	if (args == NULL) {
++		return;
++	}
++	sweet_stage_hexline(args, a, 1850);
++	sweet_stage_hexline(args, b, 1950);
++	sweet_stage_hexline(args, c, 2050);
++	sweet_stage_hexline(args, d, 2150);
++}
+--- a/bsd/dev/sweet_ufs.c
++++ b/bsd/dev/sweet_ufs.c
+@@ -402,12 +402,12 @@
+ 		return 0;
+ 	}
+ 	{
+-		extern void sweet_stage_stackdump(uint64_t, uint64_t, uint64_t, uint64_t);
++		extern void sweet_stage_field(uint64_t, uint64_t, uint64_t, uint64_t);
+ 		uint64_t n0 = 0, n1 = 0;
+ 
+ 		dma_copy_from(DMA_BOUNCE + 56, &n0, sizeof(n0));
+ 		dma_copy_from(DMA_BOUNCE + esz + 56, &n1, sizeof(n1));
+-		sweet_stage_stackdump(((uint64_t)nent << 32) | esz, entry_lba, n0, n1);
++		sweet_stage_field(((uint64_t)nent << 32) | esz, entry_lba, n0, n1);
+ 	}
+ 	return ENOENT;
+ }

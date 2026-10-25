@@ -821,6 +821,57 @@ index 00f98ee..70ecc45 100644
  	/* Register the ipc_pthread_priority manager with the Vouchers sub system. */
  	ipc_register_well_known_mach_voucher_attr_manager(
  		&ipc_pthread_priority_manager,
+diff --git a/pexpert/arm/pe_init.c b/pexpert/arm/pe_init.c
+index f3532cc..d66566a 100644
+--- a/pexpert/arm/pe_init.c
++++ b/pexpert/arm/pe_init.c
+@@ -250,6 +250,8 @@ PE_initialize_console(PE_Video * info, int op)
+ 	return 0;
+ }
+ 
++extern void sweet_stage_mark(boot_args *args, unsigned int stage);
++
+ void
+ PE_init_iokit(void)
+ {
+@@ -267,6 +269,8 @@ PE_init_iokit(void)
+ 	PE_init_printf(TRUE);
+ 
+ 	printf("iBoot version: %s\n", iBoot_version);
++
++	sweet_stage_mark(NULL, 160);
+ #if defined(TARGET_OS_OSX) && defined(__arm64__)
+ 	printf("iBoot Stage 2 version: %s\n", iBoot_Stage_2_version);
+ #endif /* defined(TARGET_OS_OSX) && defined(__arm64__) */
+@@ -288,8 +292,12 @@ PE_init_iokit(void)
+ 		}
+ 	}
+ 
++	sweet_stage_mark(NULL, 161);
++
+ 	pe_prepare_images();
+ 
++	sweet_stage_mark(NULL, 162);
++
+ 	scale = PE_state.video.v_scale;
+ 	flip = 1;
+ 
+@@ -380,8 +388,15 @@ PE_init_iokit(void)
+ #endif
+ 	}
+ 
++	sweet_stage_mark(NULL, 164);
++
+ 	InitIOKit(PE_state.deviceTreeHead);
++
++	sweet_stage_mark(NULL, 165);
++
+ 	ConfigureIOKit();
++
++	sweet_stage_mark(NULL, 166);
+ }
+ 
+ void
 diff --git a/pexpert/arm/pe_kprintf.c b/pexpert/arm/pe_kprintf.c
 index 3c440ec..25e5f02 100644
 --- a/pexpert/arm/pe_kprintf.c

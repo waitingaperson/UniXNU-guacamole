@@ -1,0 +1,18 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -583,6 +583,15 @@
+ 			extern void sweet_boot_stackdump(thread_t);
+ 			sweet_boot_stackdump(sweet_boot_thread);
+ 		}
++		if (beat >= 3) {
++			/*
++			 * The heartbeat has shown the stack and the counter; park
++			 * this thread so it cannot starve the boot thread's
++			 * worker threads on a preemption-starved scheduler.
++			 */
++			assert_wait(&sweet_heartbeat_event, THREAD_UNINT);
++			(void)thread_block(THREAD_CONTINUE_NULL);
++		}
+ 	}
+ 	return NULL;
+ }

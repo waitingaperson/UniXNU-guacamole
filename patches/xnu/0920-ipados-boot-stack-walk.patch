@@ -1,0 +1,72 @@
+--- a/osfmk/arm64/sweet_stage.c
++++ b/osfmk/arm64/sweet_stage.c
+@@ -228,3 +228,18 @@
+ 	}
+ 	sweet_stage_hexline(args, value, 2900);
+ }
++
++/* Draw four arbitrary values in the fault rows (used for stack traces). */
++void
++sweet_stage_stackdump(uint64_t a, uint64_t b, uint64_t c, uint64_t d)
++{
++	boot_args *args = sweet_stage_args;
++
++	if (args == NULL) {
++		return;
++	}
++	sweet_stage_hexline(args, a, 2400);
++	sweet_stage_hexline(args, b, 2520);
++	sweet_stage_hexline(args, c, 2640);
++	sweet_stage_hexline(args, d, 2760);
++}
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -565,12 +565,14 @@
+ #endif
+ 
+ static int sweet_heartbeat_event;
++static thread_t sweet_boot_thread;
+ 
+ static void *
+ sweet_heartbeat_thread(void *arg __unused, wait_result_t wr __unused)
+ {
+ 	uint64_t beat = 0;
+ 	extern void sweet_stage_heartbeat(uint64_t value);
++	extern void sweet_stage_stackdump(uint64_t, uint64_t, uint64_t, uint64_t);
+ 
+ 	for (;;) {
+ 		volatile uint64_t spin = 0;
+@@ -580,6 +582,25 @@
+ 			__asm__ volatile ("yield" ::: "memory");
+ 		}
+ 		sweet_stage_heartbeat(++beat);
++
++		if (beat > 1 && sweet_boot_thread != THREAD_NULL &&
++		    sweet_boot_thread != current_thread()) {
++			thread_kernel_state_t ks =
++			    (thread_kernel_state_t)sweet_boot_thread->machine.kstackptr;
++			uint64_t frames[4] = { 0, 0, 0, 0 };
++
++			if (ks != NULL) {
++				uint64_t fp = ks->machine.ss.fp;
++				for (int i = 0; i < 4 && fp; i++) {
++					if ((fp & 7) || (fp >> 48) != 0xffffff) {
++						break;
++					}
++					frames[i] = *(volatile uint64_t *)(fp + 8);
++					fp = *(volatile uint64_t *)fp;
++				}
++			}
++			sweet_stage_stackdump(frames[0], frames[1], frames[2], frames[3]);
++		}
+ 	}
+ 	return NULL;
+ }
+@@ -614,6 +635,7 @@
+ 
+ 	printf(copyright);
+ 
++	sweet_boot_thread = current_thread();
+ 	{
+ 		extern void *sweet_heartbeat_thread(void *, wait_result_t);
+ 		thread_t heartbeat_thread = THREAD_NULL;

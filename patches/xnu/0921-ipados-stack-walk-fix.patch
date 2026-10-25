@@ -1,0 +1,20 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -585,12 +585,13 @@
+ 
+ 		if (beat > 1 && sweet_boot_thread != THREAD_NULL &&
+ 		    sweet_boot_thread != current_thread()) {
+-			thread_kernel_state_t ks =
+-			    (thread_kernel_state_t)sweet_boot_thread->machine.kstackptr;
++			uint64_t kstack =
++			    (uint64_t)(uintptr_t)sweet_boot_thread->machine.kstackptr;
+ 			uint64_t frames[4] = { 0, 0, 0, 0 };
+ 
+-			if (ks != NULL) {
+-				uint64_t fp = ks->machine.ss.fp;
++			if (kstack != 0) {
++				/* arm_kernel_saved_state: x[10], fp at offset 80 */
++				uint64_t fp = *(volatile uint64_t *)(kstack + 80);
+ 				for (int i = 0; i < 4 && fp; i++) {
+ 					if ((fp & 7) || (fp >> 48) != 0xffffff) {
+ 						break;

@@ -1,0 +1,79 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -572,7 +572,6 @@
+ {
+ 	uint64_t beat = 0;
+ 	extern void sweet_stage_heartbeat(uint64_t value);
+-	extern void sweet_stage_stackdump(uint64_t, uint64_t, uint64_t, uint64_t);
+ 
+ 	for (;;) {
+ 		volatile uint64_t spin = 0;
+@@ -583,24 +582,9 @@
+ 		}
+ 		sweet_stage_heartbeat(++beat);
+ 
+-		if (beat > 1 && sweet_boot_thread != THREAD_NULL &&
+-		    sweet_boot_thread != current_thread()) {
+-			uint64_t kstack =
+-			    (uint64_t)(uintptr_t)sweet_boot_thread->machine.kstackptr;
+-			uint64_t frames[4] = { 0, 0, 0, 0 };
+-
+-			if (kstack != 0) {
+-				/* arm_kernel_saved_state: x[10], fp at offset 80 */
+-				uint64_t fp = *(volatile uint64_t *)(kstack + 80);
+-				for (int i = 0; i < 4 && fp; i++) {
+-					if ((fp & 7) || (fp >> 48) != 0xffffff) {
+-						break;
+-					}
+-					frames[i] = *(volatile uint64_t *)(fp + 8);
+-					fp = *(volatile uint64_t *)fp;
+-				}
+-			}
+-			sweet_stage_stackdump(frames[0], frames[1], frames[2], frames[3]);
++		if (beat > 1) {
++			extern void sweet_boot_stackdump(thread_t);
++			sweet_boot_stackdump(sweet_boot_thread);
+ 		}
+ 	}
+ 	return NULL;
+--- a/osfmk/kern/thread.c
++++ b/osfmk/kern/thread.c
+@@ -751,6 +751,38 @@
+ 	return os_ref_release_raw(&thread->ref_count, &thread_refgrp) == 0;
+ }
+ 
++/*
++ * Guacamole: draw the blocked boot thread's kernel stack return addresses in
++ * the framebuffer. Called from the heartbeat thread when boot output stops,
++ * to identify where the boot thread is stuck.
++ */
++void
++sweet_boot_stackdump(thread_t t)
++{
++	extern void sweet_stage_stackdump(uint64_t, uint64_t, uint64_t, uint64_t);
++	uint64_t frames[4] = { 0, 0, 0, 0 };
++	uint64_t kstack;
++	uint64_t fp;
++
++	if (t == THREAD_NULL || t == current_thread()) {
++		return;
++	}
++	kstack = (uint64_t)(uintptr_t)t->machine.kstackptr;
++	if (kstack == 0) {
++		return;
++	}
++	/* arm_kernel_saved_state: x[10] then fp */
++	fp = *(volatile uint64_t *)(kstack + 80);
++	for (int i = 0; i < 4 && fp != 0; i++) {
++		if ((fp & 7) != 0 || (fp >> 48) != 0xffffff) {
++			break;
++		}
++		frames[i] = *(volatile uint64_t *)(fp + 8);
++		fp = *(volatile uint64_t *)fp;
++	}
++	sweet_stage_stackdump(frames[0], frames[1], frames[2], frames[3]);
++}
++
+ /* Drop a thread refcount safely without triggering a zfree */
+ void
+ thread_deallocate_safe(thread_t thread)

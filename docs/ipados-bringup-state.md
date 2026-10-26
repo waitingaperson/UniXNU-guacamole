@@ -25,26 +25,34 @@ runs — the timeout wake is the missing piece).
 6. Boot-stage markers reached so far: `set_rootvnode` (0x28), end of the
    auth block (0x29=41), devfs/siginit (0x49=73), end of bsd_init (0x2A=42).
 
-## Where it stops
+## Where it stops (2026-10-26, after the platform timer fix)
 
-`bsd_utaskbootstrap()` -> `cloneproc()` -> `fork_create_child()`:
-- Every step of `fork_create_child` completes (stage 0x61=97 is drawn).
-- The final `thread_yield_internal(1)` never returns and the init thread
-  never runs: `bsdinit_task` entry markers (slot 1: 43/44/45) are never
-  drawn. `cpus=1` did not change this; replacing the yield with
-  `IOSleep(100)` was the last experiment (result not yet observed).
+The former fork blocker is gone. `ArmCpu` enabled and dispatched Apple/QEMU's
+virtual-timer INTID (27); SM8150 integrates the arch-timer outputs at
+17/18/19/16, so the deadline wake never fired and the boot thread parked in
+`machine_switch_context` forever. `ArmCpu` now reads `virtual-timer-intid`
+from the ADT intc node (19 here; 27 remains the QEMU/sheng fallback) and the
+100 ms sleep wakes: the boot continues past `bsd_utaskbootstrap`, `bsdinit_task`
+runs, and `load_init_program` execs launchd (observed on hardware).
 
-Interpretation: the freshly cloned init thread is not scheduled (not on a
-runqueue / never woken), so the cloning thread either blocks in the yield
-or, with the yield removed, finishes bsd_init while process 1 never starts.
+The boot now stops later, in userspace bring-up:
 
-Open hypotheses:
-- The cloned init thread is created waiting on `task_wait_to_return` and
-  `task_clear_return_wait` does not make it runnable on this platform.
-- Scheduler/timer/IPI support in the current 8796-era `ArmCpu`/timer
-  patches is incomplete for the 10063 scheduler (the docs' platform page
-  specifies the ArmCpu/ArmDTPlatform work: CPU registration, timer/GIC,
-  secondary entry, IPI). This is the documented next porting step.
+1. The IPSW trust caches are IM4P containers; DarwinBoot refused them as
+   `EFI_COMPROMISED_DATA`. `scripts/pack-trust-bundle.py` now produces the
+   module-table bundle `kernel.macho.trustcache` (byte-identical to UniXNU's
+   original-static-system bundle) and the kernel builds the trust-cache
+   runtime (`CONFIG_XNU_TRUST_CACHE_RUNTIME=y`).
+2. AMFI's `ConfigurationSettings` then panics with `AMFI: No PMGR?` until an
+   `ApplePMGRNub` service exists. `drivers/GuacPMGR/GuacPMGR.cpp` publishes a
+   real provider-less instance (the original readAon/writeAon helpers return 0
+   when `nub+0x88` is NULL), wired through `XNU_SHENG_PMGR`.
+3. The non-sleepable RW-lock invariant (`lck_rw_lock_shared` with preemption
+   enabled) is guarded at the two remaining raw sites: the PPL trust-cache
+   runtime lock and the code-signing profile rbtree lock in `pmap.c`
+   (`pmap_lock()` already disables preemption itself under `!XNU_MONITOR`).
+
+Next walls after that are the launchd exec and the userland (SystemOS/Data
+mounts, display).
 
 ## Root authentication: what sheng does
 
@@ -175,22 +183,16 @@ Boot args currently relevant: `root-live-fs=1`,
 
 ## Next steps
 
-1. ~~Observe the `IOSleep(100)` experiment~~ Done 2026-10-26 (session log 7):
-   `bsdinit_task` (slot 1) still never starts. The boot thread parks in
-   `machine_switch_context` (via `fork_create_child+0x190` →
-   `delay_for_interval+0x8c` → `thread_block_reason+0x100` →
-   `thread_invoke+0x4ac`) and the 100 ms deadline wake never fires — for 38
-   minutes (`sweet_stage_heartbeat` 0x8e8 = 2280 beats at row 2900, and the
-   heartbeat thread itself runs). Cross-thread wakeups DO work (the IOKit
-   `Waiting on <IOPropertyMatch UUID…>` wait completed when the volume media
-   appeared); what is missing is the timer-interrupt/deadline wake. The
-   yield-vs-sleep distinction is moot.
-2. Port the documented platform pieces (ArmDTPlatform, ArmCpu timer/GIC/IPI,
-   SMMU) from the reference UniXNU-sheng sources instead of the older
-   8796-era patches — the timer interrupt/deadline wake is now the proven
-   blocker, and the init thread will need it too.
-3. Only after process 1 runs: OS services (SystemOS/Data mounts) and the
-   display path (`GopFramebuffer` + `NativeLegacyDisplay`, Aloha GOP) per
+1. ~~Observe the `IOSleep(100)` experiment~~ Done 2026-10-26 (session log 7).
+2. ~~Port the platform timer/GIC pieces~~ Done 2026-10-26 (session log 8):
+   the virtual-timer INTID now comes from the ADT (`virtual-timer-intid`, 19
+   on SM8150) and the deadline wake works; the clone blocker is gone.
+3. Bring up the userspace entry: the trust bundle (session log 9), the AMFI
+   PMGR nub (session log 10) and the PMGR/lock guards (session log 11) are in
+   the current image; the next boot shows the next wall (launchd exec,
+   SystemOS/Data mounts, display).
+4. After process 1 runs: OS services (SystemOS/Data mounts) and the display
+   path (`GopFramebuffer` + `NativeLegacyDisplay`, Aloha GOP) per
    <https://unixnu.com/zh/porting/display>.
 
 ## Restoring this exact source state
@@ -262,3 +264,42 @@ been re-applied somewhere.
    thread itself kept running. Cross-thread wakeups work (the IOKit root wait
    completed); the timer-interrupt/deadline wake does not — that is the
    blocker to port.
+8. 2026-10-26, platform timer (commit `bada65e`): the cut wire was the
+   virtual-timer PPI INTID. `ArmCpu` enabled/dispatched Apple/QEMU's INTID 27
+   and dispatched only 27, while SM8150 wires the arch-timer outputs to
+   17/18/19/16 — the OnePlus downstream `sm8150.dtsi` and the phone's own FDT
+   both say `<1 1>, <1 2>, <1 3>, <1 0>` (CNTV = INTID 19). `ArmCpu` now reads
+   `virtual-timer-intid` from the ADT intc node (27 stays the QEMU/sheng
+   default), the ADT carries `redistributor-stride` 0x20000, and slot 3 draws
+   the timer count / GIC-ready / registered / INTID state. Hardware boot:
+   the panic went away and the boot advanced past `bsd_utaskbootstrap`; the
+   next wall was a userspace panic (entry 9).
+9. 2026-10-26, trust bundle: the IPSW trust caches are IM4P/DER containers
+   (`trst` OS, `trcs` Cryptex1,SystemOS); DarwinBoot's ValidTrustCaches
+   requires the module-table bundle, so the raw files were refused with
+   `EFI_COMPROMISED_DATA`. `scripts/pack-trust-bundle.py` unpacks each IM4P,
+   validates the loader rules (magic 2, 24-byte entries, ascending cdhashes,
+   type 1..4) and concatenates them: 61,356 bytes, sha256 `7416ca4f…`,
+   byte-identical to UniXNU's original-static-system bundle. The ADT gets the
+   zeroed `/chosen/memory-map/TrustCache` placeholder (`mkadt --trust-cache`),
+   the payload carries the bundle as `kernel.macho.trustcache`, and
+   `CONFIG_XNU_TRUST_CACHE_RUNTIME=y` builds the kernel-side runtime (commit
+   `e99d35b`). Bootloader accepted it.
+10. 2026-10-26, AMFI PMGR (commit `4eaa0e0`): the next panic was AMFI's
+    `ConfigurationSettings.cpp:235` `AMFI: No PMGR?`. Disassembly of the
+    prelinked AMFI code shows `serviceMatching("ApplePMGRNub")` →
+    `waitForMatchingService(…, 30 s)` → `safeMetaCast(ApplePMGRNub)`, then
+    `readAon() | 4` → `writeAon()`; the original helpers read the provider at
+    `nub+0x88` and return 0 when it is NULL. `drivers/GuacPMGR/GuacPMGR.cpp`
+    therefore allocates the real (prelinked) ApplePMGRNub by name, inits,
+    attaches to the platform expert and registers it; `XNU_SHENG_PMGR=y`
+    selects it (bsd_init calls `sheng_pmgr_run` before calendar init).
+11. 2026-10-26, lock invariants (commit `dfb5a14` + 0988/0989): two panics
+    traced to `lck_rw_lock_shared` taking non-sleepable locks with preemption
+    enabled: `ppl_trust_cache_rt_lock` and `pmap_cs_profiles_rbtree_lock`
+    (both run through the PPL entry on Apple silicon, which is what disables
+    preemption). All six raw lock sites in `pmap.c` now call
+    `disable_preemption()/enable_preemption()`; `pmap_lock()` already does it
+    itself under `!XNU_MONITOR`. The panic path also draws the panicking
+    thread's 12-frame backtrace once (0988) after clearing the strip below the
+    console, so a photo carries the whole trail.

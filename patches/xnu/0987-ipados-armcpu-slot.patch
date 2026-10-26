@@ -1,0 +1,21 @@
+diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
+index 63837a8..246c92e 100644
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -581,6 +581,16 @@ native_mobile_graphics_load_probe(void)
+ static int sweet_heartbeat_event;
+ static thread_t sweet_boot_thread;
+ 
++/*
++ * ArmCpu component state, mirrored for the bootstrap pass (which links no
++ * component archives): weak dummies that the strong ArmCpu.o definitions
++ * override whenever the component is linked.
++ */
++__attribute__((weak)) volatile uint32_t armcpu_gic_ready = 0;
++__attribute__((weak)) volatile uint32_t armcpu_registered = 0;
++__attribute__((weak)) volatile uint32_t armcpu_vtimer_intid = 27;
++__attribute__((weak)) volatile uint64_t armcpu_timer_interrupts = 0;
++
+ static void *
+ sweet_heartbeat_thread(void *arg __unused, wait_result_t wr __unused)
+ {

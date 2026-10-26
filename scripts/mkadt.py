@@ -254,6 +254,9 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
         ('compatible', cstr('arm,gic-v3')),
         ('interrupt-controller', b''),
         ('virtual-timer-intid', u32(vtimer_intid)),
+        # GICR frame spacing for the ArmCpu frame walk: the guacamole live FDT
+        # (and QEMU virt) both use 0x20000 per core.
+        ('redistributor-stride', u64(0x20000)),
         ('reg', u64(gicd - SOC_BASE, gicd_size, gicr - SOC_BASE, gicr_size)),
     ])
     arm_io = node('arm-io', [

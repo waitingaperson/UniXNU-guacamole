@@ -1,9 +1,9 @@
 diff --git a/.guacamole-applied b/.guacamole-applied
 new file mode 100644
-index 0000000..f94b519
+index 0000000..73a1652
 --- /dev/null
 +++ b/.guacamole-applied
-@@ -0,0 +1,135 @@
+@@ -0,0 +1,137 @@
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0400-guacamole-ufs-root.patch 3b89686a58e3c73faa1144e3d5127ef47aeb15dd9018c3bd364aa0dd9a466db3
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0900-ipados-iorpc-kernel-declaration.patch 5d7c085fee35864280997b50552ed4d9c141bc41212d8c33146f6858930c218d
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0901-ipados-framebuffer-console.patch ebc54d1e2774f69f5e3fe6ce6e85a1f8f5ca8b7dec0879eeb4043d634131e2ad
@@ -139,6 +139,8 @@ index 0000000..f94b519
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0984-ipados-cloneproc-stages.patch cbe282842c6df5855f541d165a0ea36c2e9dd2866603c8d26ba0936852dfc7bc
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0984-ipados-cloneproc-stages.patch 27de8d83b09e4d5085511922fe8f7d746e5157cf73a62b20fee8c4e839ac2a6b
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0985-ipados-forkchild-stages.patch 4f2355b0aacb905f5d6521ed94768b45b17ab2fa9a05b35dbf80dc71d8322b37
++/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0986-ipados-vcattach-text-screen.patch f66934c98c4cbd5beb9c88db4f9536cb2abb8f3165e30feb05e7db6d34794ba1
++/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/zzz-current-state.patch f4496f2771152f82c7158673829727ddaee829f396019b236631007f9fbbfd28
 diff --git a/EXTERNAL_HEADERS/CoreEntitlements/CoreEntitlements.h b/EXTERNAL_HEADERS/CoreEntitlements/CoreEntitlements.h
 index 60e7e8f..5831a6c 100644
 --- a/EXTERNAL_HEADERS/CoreEntitlements/CoreEntitlements.h
@@ -2572,7 +2574,7 @@ index 0000000..844f334
 +}
 +#endif /* ARM64_BOARD_CONFIG_SWEET */
 diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
-index bb558ee..8686b3f 100644
+index bb558ee..246c92e 100644
 --- a/bsd/kern/bsd_init.c
 +++ b/bsd/kern/bsd_init.c
 @@ -1,3 +1,4 @@
@@ -2603,7 +2605,7 @@ index bb558ee..8686b3f 100644
  #include <sys/kern_overrides.h>         /* for init_system_override() */
  #include <sys/lockf.h>                  /* for lf_init() */
  #include <sys/fsctl.h>
-@@ -478,9 +493,118 @@ bsd_rooted_ramdisk(void)
+@@ -478,9 +493,145 @@ bsd_rooted_ramdisk(void)
   * of the tro_ucred field so that the uthread structure can be
   * used like any other.
   */
@@ -2695,6 +2697,16 @@ index bb558ee..8686b3f 100644
 +static int sweet_heartbeat_event;
 +static thread_t sweet_boot_thread;
 +
++/*
++ * ArmCpu component state, mirrored for the bootstrap pass (which links no
++ * component archives): weak dummies that the strong ArmCpu.o definitions
++ * override whenever the component is linked.
++ */
++__attribute__((weak)) volatile uint32_t armcpu_gic_ready = 0;
++__attribute__((weak)) volatile uint32_t armcpu_registered = 0;
++__attribute__((weak)) volatile uint32_t armcpu_vtimer_intid = 27;
++__attribute__((weak)) volatile uint64_t armcpu_timer_interrupts = 0;
++
 +static void *
 +sweet_heartbeat_thread(void *arg __unused, wait_result_t wr __unused)
 +{
@@ -2706,6 +2718,23 @@ index bb558ee..8686b3f 100644
 +			thread_yield_to_preemption();
 +		}
 +		sweet_stage_heartbeat(++beat);
++		{
++			/*
++			 * Slot 3 (row 2150): the ArmCpu state, so a photo shows whether
++			 * the board's virtual-timer line is wired: the low 48 bits are
++			 * the architectural timer interrupt count, bit 48 GIC ready,
++			 * bit 49 CPU registered, bits 52+ the INTID the driver
++			 * dispatches as the virtual timer.
++			 */
++			extern volatile uint32_t armcpu_gic_ready;
++			extern volatile uint32_t armcpu_registered;
++			extern volatile uint32_t armcpu_vtimer_intid;
++			extern volatile uint64_t armcpu_timer_interrupts;
++			sweet_stage_slot(3, (armcpu_timer_interrupts & 0xffffffffffffULL) |
++			    ((uint64_t)(armcpu_gic_ready != 0) << 48) |
++			    ((uint64_t)(armcpu_registered != 0) << 49) |
++			    ((uint64_t)armcpu_vtimer_intid << 52));
++		}
 +
 +		if (beat > 1) {
 +			extern void sweet_boot_stackdump(thread_t);
@@ -2722,7 +2751,7 @@ index bb558ee..8686b3f 100644
  	struct uthread *ut;
  	vnode_t init_rootvnode = NULLVP;
  	struct proc_ro_data kernproc_ro_data = {
-@@ -495,18 +619,34 @@ bsd_init(void)
+@@ -495,18 +646,34 @@ bsd_init(void)
  	platform_stall_panic_or_spin(PLATFORM_STALL_XNU_LOCATION_BSD_INIT);
  #endif
  
@@ -2759,7 +2788,7 @@ index bb558ee..8686b3f 100644
  #if CONFIG_DEV_KMEM
  	bsd_init_kprintf("calling dev_kmem_init\n");
  	dev_kmem_init();
-@@ -688,6 +828,13 @@ bsd_init(void)
+@@ -688,6 +855,13 @@ bsd_init(void)
  	bsd_init_kprintf("calling bsd_bufferinit\n");
  	bsd_bufferinit();
  
@@ -2773,7 +2802,7 @@ index bb558ee..8686b3f 100644
  	/*
  	 * Initialize the calendar.
  	 */
-@@ -697,6 +844,27 @@ bsd_init(void)
+@@ -697,6 +871,27 @@ bsd_init(void)
  	/* Initialize the file systems. */
  	bsd_init_kprintf("calling vfsinit\n");
  	vfsinit();
@@ -2801,7 +2830,7 @@ index bb558ee..8686b3f 100644
  
  #if CONFIG_PROC_UUID_POLICY
  	/* Initial proc_uuid_policy subsystem */
-@@ -798,6 +966,15 @@ bsd_init(void)
+@@ -798,6 +993,15 @@ bsd_init(void)
  
  	bsd_init_kprintf("calling sysctl_mib_init\n");
  	sysctl_mib_init();
@@ -2817,7 +2846,7 @@ index bb558ee..8686b3f 100644
  
  	bsd_init_kprintf("calling bsd_autoconf\n");
  	bsd_autoconf();
-@@ -805,6 +982,10 @@ bsd_init(void)
+@@ -805,6 +1009,10 @@ bsd_init(void)
  #if CONFIG_DTRACE
  	dtrace_postinit();
  #endif
@@ -2828,7 +2857,7 @@ index bb558ee..8686b3f 100644
  
  	/*
  	 * We attach the loopback interface *way* down here to ensure
-@@ -888,7 +1069,10 @@ bsd_init(void)
+@@ -888,7 +1096,10 @@ bsd_init(void)
  #endif
  
  		bsd_init_kprintf("vfs_mountroot\n");
@@ -2839,7 +2868,7 @@ index bb558ee..8686b3f 100644
  			break;
  		}
  		rootdevice[0] = '\0';
-@@ -908,7 +1092,9 @@ bsd_init(void)
+@@ -908,7 +1119,9 @@ bsd_init(void)
  		printf("cannot mount root, errno = %d\n", err);
  	}
  
@@ -2849,7 +2878,7 @@ index bb558ee..8686b3f 100644
  
  	mountlist.tqh_first->mnt_flag |= MNT_ROOTFS;
  
-@@ -922,6 +1108,7 @@ bsd_init(void)
+@@ -922,6 +1135,7 @@ bsd_init(void)
  
  	lck_rw_lock_exclusive(&rootvnode_rw_lock);
  	set_rootvnode(init_rootvnode);
@@ -2857,7 +2886,7 @@ index bb558ee..8686b3f 100644
  	lck_rw_unlock_exclusive(&rootvnode_rw_lock);
  	init_rootvnode = NULLVP;  /* use rootvnode after this point */
  
-@@ -942,11 +1129,50 @@ bsd_init(void)
+@@ -942,11 +1156,50 @@ bsd_init(void)
  		if (require_rootauth) {
  			/* enforce sealedness */
  			int autherr = VNOP_IOCTL(rootvnode, FSIOC_KERNEL_ROOTAUTH, NULL, 0, vfs_context_kernel());
@@ -2885,7 +2914,7 @@ index bb558ee..8686b3f 100644
 +				owner_authorized = owner;
 +#endif
 +				native_owner_root_checkpoint(autherr, owner, device);
- 			}
++			}
 +#endif
 +			{
 +				int guac_skip_rootauth = 0;
@@ -2894,7 +2923,7 @@ index bb558ee..8686b3f 100644
 +				if (autherr && !owner_authorized && !guac_skip_rootauth) {
 +					panic("rootvp not authenticated after mounting");
 +				}
-+			}
+ 			}
 +#if defined(XNU_OWNER_ROOT_TRUST) && XNU_OWNER_ROOT_TRUST
 +			{
 +				extern volatile int native_owner_root_accepted;
@@ -2910,7 +2939,7 @@ index bb558ee..8686b3f 100644
  
  
  #if CONFIG_NETBOOT
-@@ -986,6 +1212,7 @@ bsd_init(void)
+@@ -986,6 +1239,7 @@ bsd_init(void)
  		IOSetImageBoot();
  	}
  
@@ -2918,7 +2947,7 @@ index bb558ee..8686b3f 100644
  #endif /* CONFIG_IMAGEBOOT */
  
  	/* set initial time; all other resource data is  already zero'ed */
-@@ -998,6 +1225,7 @@ bsd_init(void)
+@@ -998,6 +1252,7 @@ bsd_init(void)
  		bsd_init_kprintf("calling devfs_kernel_mount\n");
  		devfs_kernel_mount(mounthere);
  	}
@@ -2926,7 +2955,7 @@ index bb558ee..8686b3f 100644
  #endif /* DEVFS */
  
  #if CONFIG_BASESYSTEMROOT
-@@ -1037,14 +1265,18 @@ bsd_init(void)
+@@ -1037,14 +1292,18 @@ bsd_init(void)
  #endif /* CONFIG_IMAGEBOOT */
  #endif /* CONFIG_BASESYSTEMROOT */
  
@@ -2945,7 +2974,7 @@ index bb558ee..8686b3f 100644
  
  	bsd_init_kprintf("calling mountroot_post_hook\n");
  
-@@ -1068,14 +1300,44 @@ bsd_init(void)
+@@ -1068,14 +1327,44 @@ bsd_init(void)
  #endif /* DEVELOPMENT || DEBUG */
  
  	bsd_init_kprintf("done\n");
@@ -2990,7 +3019,7 @@ index bb558ee..8686b3f 100644
  
  	/* Set up exception-to-signal reflection */
  	ux_handler_setup();
-@@ -1085,6 +1347,7 @@ bsdinit_task(void)
+@@ -1085,6 +1374,7 @@ bsdinit_task(void)
  #endif
  
  	vm_init_before_launchd();
@@ -2998,7 +3027,7 @@ index bb558ee..8686b3f 100644
  
  #if CONFIG_XNUPOST
  	int result = bsd_list_tests();
-@@ -1096,6 +1359,8 @@ bsdinit_task(void)
+@@ -1096,6 +1386,8 @@ bsdinit_task(void)
  
  	bsd_init_kprintf("bsd_do_post - done");
  
@@ -3007,7 +3036,7 @@ index bb558ee..8686b3f 100644
  	load_init_program(p);
  	lock_trace = 1;
  }
-@@ -1117,7 +1382,15 @@ bsd_autoconf(void)
+@@ -1117,7 +1409,15 @@ bsd_autoconf(void)
  		}
  	}
  
@@ -3024,7 +3053,7 @@ index bb558ee..8686b3f 100644
  }
  
  
-@@ -1170,10 +1443,13 @@ bsd_utaskbootstrap(void)
+@@ -1170,10 +1470,13 @@ bsd_utaskbootstrap(void)
  	 * Clone the bootstrap process from the kernel process, without
  	 * inheriting either task characteristics or memory from the kernel;
  	 */
@@ -3038,7 +3067,7 @@ index bb558ee..8686b3f 100644
  #if __PROC_INTERNAL_DEBUG
  	if (initproc == PROC_NULL) {
  		panic("bsd_utaskbootstrap: initproc not set");
-@@ -1181,6 +1457,7 @@ bsd_utaskbootstrap(void)
+@@ -1181,6 +1484,7 @@ bsd_utaskbootstrap(void)
  #endif
  
  	zalloc_first_proc_made();
@@ -3046,7 +3075,7 @@ index bb558ee..8686b3f 100644
  
  	/*
  	 * Since we aren't going back out the normal way to our parent,
-@@ -1188,14 +1465,17 @@ bsd_utaskbootstrap(void)
+@@ -1188,14 +1492,17 @@ bsd_utaskbootstrap(void)
  	 */
  	proc_signalend(initproc, 0);
  	proc_transend(initproc, 0);
@@ -3064,7 +3093,7 @@ index bb558ee..8686b3f 100644
  }
  
  static void
-@@ -1591,3 +1871,5 @@ netboot_root(void)
+@@ -1591,3 +1898,5 @@ netboot_root(void)
  	return 0;
  }
  #endif

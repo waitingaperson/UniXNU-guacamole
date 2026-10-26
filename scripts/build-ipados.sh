@@ -30,7 +30,15 @@ python3 unixnu/kits/NativePrelink/emit_prelink.py \
 # authenticate. Disable that single decision in the prelinked kext.
 python3 scripts/patch-apfs-rootauth.py "$OUT"
 
-./unixnu/unixnu build payload --kernel "$OUT" --unique-chip-id 0x5357454554000001 -D .
+# DarwinBoot and the kernel want one trust bundle (module table + modules),
+# not the IM4P containers the IPSW ships: unpack the OS StaticTrustCache and
+# the Cryptex1,SystemOS trust cache and concatenate them byte for byte.
+python3 scripts/pack-trust-bundle.py \
+  out/ipsw/044-76040-038.dmg.trustcache out/ipsw/044-76034-038.dmg.trustcache \
+  --output out/guacamole/payload/trust.bundle
+
+./unixnu/unixnu build payload --kernel "$OUT" --unique-chip-id 0x5357454554000001 \
+  --trust-cache out/guacamole/payload/trust.bundle -D .
 
 python3 scripts/build-bootimg.py \
   --fd uefi/Build/SurfaceDuo1Pkg/DEBUG_CLANGPDB/FV/SM8150_EFI.fd \

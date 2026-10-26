@@ -20,6 +20,7 @@ def main():
     parser.add_argument("--ipad-identity", action="store_true")
     parser.add_argument("--chip-id")
     parser.add_argument("--root-match-volume-uuid")
+    parser.add_argument("--trust-cache", action="store_true")
     known, _unknown = parser.parse_known_args()
     tool = Path(__file__).resolve().parent / "mkadt.py"
     command = [sys.executable, str(tool), known.output, "--device", "guacamole",
@@ -32,6 +33,8 @@ def main():
         command += ["--chip-id", str(known.chip_id)]
     if known.root_match_volume_uuid:
         command += ["--root-match-volume-uuid", known.root_match_volume_uuid]
+    if known.trust_cache:
+        command += ["--trust-cache"]
     subprocess.run(command, check=True)
 
 

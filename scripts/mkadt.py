@@ -106,7 +106,7 @@ def empty_nvram_proxy(variables=()):
 
 def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
           owned_memory_size=None, ipad_identity=False, root_match_uuid=None,
-          ipad_chip_id=0x207):
+          ipad_chip_id=0x207, trust_cache=False):
     """qemu=True: same tree, but with QEMU virt's GIC addresses and CNTFRQ (tools/qemu-sweet.py).
     dram_size overrides the profile's kernel RAM size (e.g. 0x180000000 on an 8 GB guacamole).
     owned_memory_size emits /chosen/darwinboot-memory-size for the contiguous kernel window."""
@@ -189,7 +189,7 @@ def build(seed=None, qemu=False, highmem=False, device='sweet', dram_size=None,
         *([('root-matching', cstr(root_matching))] if root_matching else []),
         ('root-live-fs', u32(1)),
         ('allow-root-hash-mismatch', u32(1)),
-    ], [node('memory-map', [ph()]),
+    ], [node('memory-map', [ph()] + ([('TrustCache', bytes(16))] if trust_cache else [])),
         # Local boot policy (kern_csr.c): SIP relaxed like `csrutil disable`
         # (lp-sip0: untrusted kexts, unrestricted FS, task_for_pid, kernel
         # debugger, dtrace, nvram), lp-sip1: unauthenticated (unsealed) root.
@@ -374,6 +374,8 @@ if __name__ == '__main__':
                     help='/chosen/chip-id for the iPad identity (hex)')
     ap.add_argument('--root-match-volume-uuid', default=None,
                     help='/chosen/root-matching Data volume UUID')
+    ap.add_argument('--trust-cache', action='store_true',
+                    help='Zeroed TrustCache sidecar handoff placeholder (the loader fills the real range)')
     ap.add_argument('--dump', action='store_true')
     args = ap.parse_args()
     if args.dump and os.path.exists(args.out):
@@ -388,7 +390,8 @@ if __name__ == '__main__':
                  dram_size=args.dram_size, owned_memory_size=args.owned_memory_size,
                  ipad_identity=args.ipad_identity,
                  root_match_uuid=args.root_match_volume_uuid,
-                 ipad_chip_id=args.chip_id or 0x207)
+                 ipad_chip_id=args.chip_id or 0x207,
+                 trust_cache=args.trust_cache)
     blob = adt.serialize(root)
     open(args.out, 'wb').write(blob)
     if args.dump:

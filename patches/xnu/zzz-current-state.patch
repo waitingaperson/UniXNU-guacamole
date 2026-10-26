@@ -1,9 +1,9 @@
 diff --git a/.guacamole-applied b/.guacamole-applied
 new file mode 100644
-index 0000000..0f28b77
+index 0000000..f0d445a
 --- /dev/null
 +++ b/.guacamole-applied
-@@ -0,0 +1,144 @@
+@@ -0,0 +1,145 @@
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0400-guacamole-ufs-root.patch 3b89686a58e3c73faa1144e3d5127ef47aeb15dd9018c3bd364aa0dd9a466db3
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0900-ipados-iorpc-kernel-declaration.patch 5d7c085fee35864280997b50552ed4d9c141bc41212d8c33146f6858930c218d
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0901-ipados-framebuffer-console.patch ebc54d1e2774f69f5e3fe6ce6e85a1f8f5ca8b7dec0879eeb4043d634131e2ad
@@ -147,7 +147,8 @@ index 0000000..0f28b77
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0989-ipados-ppl-preempt.patch bfc4f596febaf74c175a4380f5c6414f93da36ff14d486a2cbecaa20b0af6950
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0990-ipados-diagnostics-strip.patch 7cd8bd26196fb289e9d225f4edeae6628ad4c6ebc9a7965d760a8e6aa63bd10f
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0991-ipados-systemos-mount.patch cc845a2d8311c76612daffddb5ecb485b8c378e45d0c19ee48f10c5b7cc5270a
-+/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/zzz-current-state.patch 266026c2627b53a4fb0ac63abf3fccf0b4c430bef481f0175de16bebae6ad4b6
++/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0991-ipados-systemos-mount.patch 4bd900d301da82aa1bafdb14431cd035fa44864376a2cf2a4c4d606c81bb7567
++/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/zzz-current-state.patch 8b9b3c1f93f08c6b5226701290b3819bd1927b68be683e8886e608377b8a0dbd
 diff --git a/EXTERNAL_HEADERS/CoreEntitlements/CoreEntitlements.h b/EXTERNAL_HEADERS/CoreEntitlements/CoreEntitlements.h
 index 60e7e8f..5831a6c 100644
 --- a/EXTERNAL_HEADERS/CoreEntitlements/CoreEntitlements.h

@@ -1,0 +1,34 @@
+diff --git a/osfmk/console/video_console.c b/osfmk/console/video_console.c
+index 43da8be..0cb40c9 100644
+--- a/osfmk/console/video_console.c
++++ b/osfmk/console/video_console.c
+@@ -3104,6 +3104,29 @@ vcattach(void)
+ 
+ 		initialize_screen(NULL, kPEAcquireScreen);
+ 
++		for (index = 0; index < msgbufp->msg_bufx; index++) {
++			if (msgbufp->msg_bufc[index] == '\0') {
++				continue;
++			}
++
++			vcputc( msgbufp->msg_bufc[index] );
++
++			if (msgbufp->msg_bufc[index] == '\n') {
++				vcputc( '\r' );
++			}
++		}
++	} else if (gc_buffer_size == 0) {
++		/*
++		 * The kPETextScreen request that runs gc_enable(TRUE) happens
++		 * before the VM is up, so the paint buffer was never allocated
++		 * and the console cannot scroll (gc_scroll_up returns early).
++		 * Allocate the buffer now and replay the messages printed since.
++		 */
++		long index;
++
++		vc_progress_set( FALSE, 0 );
++		gc_enable( TRUE );
++
+ 		for (index = 0; index < msgbufp->msg_bufx; index++) {
+ 			if (msgbufp->msg_bufc[index] == '\0') {
+ 				continue;

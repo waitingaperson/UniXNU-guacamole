@@ -1,9 +1,9 @@
 diff --git a/.guacamole-applied b/.guacamole-applied
 new file mode 100644
-index 0000000..73a1652
+index 0000000..ead08df
 --- /dev/null
 +++ b/.guacamole-applied
-@@ -0,0 +1,137 @@
+@@ -0,0 +1,140 @@
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0400-guacamole-ufs-root.patch 3b89686a58e3c73faa1144e3d5127ef47aeb15dd9018c3bd364aa0dd9a466db3
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0900-ipados-iorpc-kernel-declaration.patch 5d7c085fee35864280997b50552ed4d9c141bc41212d8c33146f6858930c218d
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0901-ipados-framebuffer-console.patch ebc54d1e2774f69f5e3fe6ce6e85a1f8f5ca8b7dec0879eeb4043d634131e2ad
@@ -140,7 +140,10 @@ index 0000000..73a1652
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0984-ipados-cloneproc-stages.patch 27de8d83b09e4d5085511922fe8f7d746e5157cf73a62b20fee8c4e839ac2a6b
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0985-ipados-forkchild-stages.patch 4f2355b0aacb905f5d6521ed94768b45b17ab2fa9a05b35dbf80dc71d8322b37
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0986-ipados-vcattach-text-screen.patch f66934c98c4cbd5beb9c88db4f9536cb2abb8f3165e30feb05e7db6d34794ba1
-+/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/zzz-current-state.patch f4496f2771152f82c7158673829727ddaee829f396019b236631007f9fbbfd28
++/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0987-ipados-armcpu-slot.patch 71c88e3231f58d9d1b73b0cf178f8418b2affeebf2c643dfd417ddfe40d2b688
++/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0987-ipados-armcpu-slot.patch 3956b3f232c3aec2087ff319cefa568463d9b253688af359533e3e4fa48263a5
++/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0988-ipados-panic-backtrace.patch 0b731d4baa98eef49457be7d99c6f6d2844dd733bdc678401df95bedfbfeca0d
++/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/zzz-current-state.patch 49b28a3386589ecbc78bf486c44a267f7cc2f7744a5987ca2b29435ee9d32dbb
 diff --git a/EXTERNAL_HEADERS/CoreEntitlements/CoreEntitlements.h b/EXTERNAL_HEADERS/CoreEntitlements/CoreEntitlements.h
 index 60e7e8f..5831a6c 100644
 --- a/EXTERNAL_HEADERS/CoreEntitlements/CoreEntitlements.h
@@ -11646,7 +11649,7 @@ index 0a0e04f..01c9600 100644
  }
  
 diff --git a/osfmk/arm/pmap/pmap.c b/osfmk/arm/pmap/pmap.c
-index 7db00b6..7b8ccd4 100644
+index 7db00b6..dfecc4e 100644
 --- a/osfmk/arm/pmap/pmap.c
 +++ b/osfmk/arm/pmap/pmap.c
 @@ -84,8 +84,12 @@
@@ -11735,6 +11738,129 @@ index 7db00b6..7b8ccd4 100644
  /**
   * Perform basic validation checks on the destination only and
   * corresponding offset/sizes prior to writing to a read only allocation.
+@@ -12802,6 +12817,13 @@ pmap_check_trust_cache_runtime_for_uuid_internal(
+ 		return KERN_NOT_SUPPORTED;
+ 	}
+ 
++	/*
++	 * On Apple silicon these runtimes are entered through the PPL, whose
++	 * entry disables preemption; entered directly on this port, emulate
++	 * that so the non-sleepable lock keeps its invariant.
++	 */
++	disable_preemption();
++
+ 	/* Lock the runtime as shared */
+ 	lck_rw_lock_shared(&ppl_trust_cache_rt_lock);
+ 
+@@ -12813,6 +12835,8 @@ pmap_check_trust_cache_runtime_for_uuid_internal(
+ 	/* Unlock the runtime */
+ 	lck_rw_unlock_shared(&ppl_trust_cache_rt_lock);
+ 
++	enable_preemption();
++
+ 	if (tc_ret.error == kTCReturnSuccess) {
+ 		ret = KERN_SUCCESS;
+ 	} else if (tc_ret.error == kTCReturnNotFound) {
+@@ -12912,7 +12936,10 @@ pmap_load_trust_cache_with_type_internal(
+ 		panic("underflow on the img4_payload_len: %lu", pmap_img4_payload_len);
+ 	}
+ 
+-	/* Exclusively lock the runtime */
++	/* Exclusively lock the runtime (see the shared sites: emulate the PPL
++	 * entry's preemption disable for the non-sleepable lock). */
++	disable_preemption();
++
+ 	lck_rw_lock_exclusive(&ppl_trust_cache_rt_lock);
+ 
+ 	/* Load the trust cache */
+@@ -12926,6 +12953,8 @@ pmap_load_trust_cache_with_type_internal(
+ 	/* Unlock the runtime */
+ 	lck_rw_unlock_exclusive(&ppl_trust_cache_rt_lock);
+ 
++	enable_preemption();
++
+ 	if (tc_ret.error == kTCReturnSuccess) {
+ 		ret = KERN_SUCCESS;
+ 	} else {
+@@ -12997,6 +13026,13 @@ pmap_query_trust_cache_safe(
+ 		return KERN_INVALID_ARGUMENT;
+ 	}
+ 
++	/*
++	 * On Apple silicon these runtimes are entered through the PPL, whose
++	 * entry disables preemption; entered directly on this port, emulate
++	 * that so the non-sleepable lock keeps its invariant.
++	 */
++	disable_preemption();
++
+ 	/* Lock the runtime as shared */
+ 	lck_rw_lock_shared(&ppl_trust_cache_rt_lock);
+ 
+@@ -13009,6 +13045,8 @@ pmap_query_trust_cache_safe(
+ 	/* Unlock the runtime */
+ 	lck_rw_unlock_shared(&ppl_trust_cache_rt_lock);
+ 
++	enable_preemption();
++
+ 	if (tc_ret.error == kTCReturnSuccess) {
+ 		ret = KERN_SUCCESS;
+ 	} else if (tc_ret.error == kTCReturnNotFound) {
+@@ -13567,12 +13605,16 @@ pmap_register_provisioning_profile_internal(
+ 	/* Mark as validated since it passed all checks */
+ 	profile_obj->profile_validated = true;
+ 
+-	/* Add the profile to the red-black tree */
++	/* Add the profile to the red-black tree (emulate the PPL entry's
++	 * preemption disable for the non-sleepable lock; see the trust-cache
++	 * sites). */
++	disable_preemption();
+ 	lck_rw_lock_exclusive(&pmap_cs_profiles_rbtree_lock);
+ 	if (RB_INSERT(pmap_cs_profiles_rbtree, &pmap_cs_registered_profiles, profile_obj) != NULL) {
+ 		panic("PMAP_CS: Anomaly, profile already exists in the tree: %p", profile_obj);
+ 	}
+ 	lck_rw_unlock_exclusive(&pmap_cs_profiles_rbtree_lock);
++	enable_preemption();
+ 
+ 	pmap_cs_log_info("%p: profile successfully registered", profile_obj);
+ 	return KERN_SUCCESS;
+@@ -13608,7 +13650,9 @@ pmap_unregister_provisioning_profile_internal(
+ {
+ 	kern_return_t ret = KERN_DENIED;
+ 
+-	/* Lock the red-black tree exclusively */
++	/* Lock the red-black tree exclusively (PPL-entry preemption disable
++	 * emulated; see the trust-cache sites). */
++	disable_preemption();
+ 	lck_rw_lock_exclusive(&pmap_cs_profiles_rbtree_lock);
+ 
+ 	if (RB_FIND(pmap_cs_profiles_rbtree, &pmap_cs_registered_profiles, profile_obj) == NULL) {
+@@ -13630,6 +13674,7 @@ pmap_unregister_provisioning_profile_internal(
+ exit:
+ 	/* Unlock the red-black tree */
+ 	lck_rw_unlock_exclusive(&pmap_cs_profiles_rbtree_lock);
++	enable_preemption();
+ 
+ 	if (ret == KERN_SUCCESS) {
+ 		/* Get the original payload address */
+@@ -13675,7 +13720,9 @@ pmap_associate_provisioning_profile_internal(
+ 		goto exit;
+ 	}
+ 
+-	/* Lock the red-black tree as shared */
++	/* Lock the red-black tree as shared (PPL-entry preemption disable
++	 * emulated; see the trust-cache sites). */
++	disable_preemption();
+ 	lck_rw_lock_shared(&pmap_cs_profiles_rbtree_lock);
+ 
+ 	if (RB_FIND(pmap_cs_profiles_rbtree, &pmap_cs_registered_profiles, profile_obj) == NULL) {
+@@ -13695,6 +13742,7 @@ pmap_associate_provisioning_profile_internal(
+ 
+ 	/* Unlock the red-black tree */
+ 	lck_rw_unlock_shared(&pmap_cs_profiles_rbtree_lock);
++	enable_preemption();
+ 
+ 	/* Association was a success */
+ 	pmap_cs_log_info("associated profile %p with signature %p", profile_obj, cd_entry);
 diff --git a/osfmk/arm/pmap/pmap.h b/osfmk/arm/pmap/pmap.h
 index 5eb664c..3f59f6b 100644
 --- a/osfmk/arm/pmap/pmap.h
@@ -12225,10 +12351,10 @@ index d4909c7..9a5f645 100644
  	// Unmask external IRQs if we're restarting from non-retention WFI
 diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 new file mode 100644
-index 0000000..844ea26
+index 0000000..46b11ba
 --- /dev/null
 +++ b/osfmk/arm64/sweet_stage.c
-@@ -0,0 +1,273 @@
+@@ -0,0 +1,364 @@
 +/*
 + * Guacamole bring-up markers. DarwinBoot leaves the boot framebuffer mapped
 + * V=P in the bootstrap tables (see the start.s patch), so these writes work
@@ -12356,6 +12482,12 @@ index 0000000..844ea26
 +static int sweet_fault_valid;
 +/* Kernel VA of the framebuffer, set once the VM is up (ml_io_map). */
 +static uint64_t sweet_stage_fb_va;
++/*
++ * Set by the panic path (sweet_stage_panic_backtrace): the heartbeat,
++ * stackdump and fault redraws stop, so a photo keeps the panicking thread's
++ * backtrace.
++ */
++volatile uint32_t sweet_stage_panic_freeze;
 +
 +void
 +sweet_stage_map_fb(boot_args *args)
@@ -12418,7 +12550,7 @@ index 0000000..844ea26
 +{
 +	boot_args *args = sweet_stage_args;
 +
-+	if (args == NULL || !sweet_fault_valid) {
++	if (args == NULL || !sweet_fault_valid || sweet_stage_panic_freeze) {
 +		return;
 +	}
 +	sweet_stage_hexline(args, sweet_fault[0], 2400);
@@ -12454,7 +12586,7 @@ index 0000000..844ea26
 +{
 +	boot_args *args = sweet_stage_args;
 +
-+	if (args == NULL) {
++	if (args == NULL || sweet_stage_panic_freeze) {
 +		return;
 +	}
 +	sweet_stage_hexline(args, value, 2900);
@@ -12466,13 +12598,98 @@ index 0000000..844ea26
 +{
 +	boot_args *args = sweet_stage_args;
 +
-+	if (args == NULL) {
++	if (args == NULL || sweet_stage_panic_freeze) {
 +		return;
 +	}
 +	sweet_stage_hexline(args, a, 2400);
 +	sweet_stage_hexline(args, b, 2520);
 +	sweet_stage_hexline(args, c, 2640);
 +	sweet_stage_hexline(args, d, 2760);
++}
++
++/* Dense hex line for the panic backtrace: scale 8, 16 digits, band height 56. */
++static void
++sweet_stage_backline(boot_args *args, uint64_t value, unsigned int y)
++{
++	uint64_t base = sweet_stage_fb_va ? sweet_stage_fb_va : args->Video.v_baseAddr;
++	uint32_t stride = (uint32_t)args->Video.v_rowBytes;
++	const uint32_t scale = 8;
++	const uint32_t ox = 24;
++	volatile uint32_t *fb;
++
++	if (base == 0 || stride < 4) {
++		return;
++	}
++	fb = (volatile uint32_t *)(uintptr_t)base;
++	for (uint32_t row = 0; row < 7 * scale; row++) {
++		volatile uint32_t *line = fb + (uint64_t)(y + row) * (stride / 4u);
++		for (uint32_t x = 0; x < 16 * 6 * scale; x++) {
++			line[ox + x] = 0;
++		}
++	}
++	for (unsigned int i = 0; i < 16; i++) {
++		unsigned int digit = (unsigned int)((value >> (60 - 4 * i)) & 0xf);
++		uint32_t dx = ox + i * 6 * scale;
++		for (unsigned int row = 0; row < 7; row++) {
++			uint8_t bits = sweet_hexfont[digit][row];
++			for (unsigned int col = 0; col < 5; col++) {
++				if ((bits & (1u << (4 - col))) == 0) {
++					continue;
++				}
++				for (uint32_t sy = 0; sy < scale; sy++) {
++					volatile uint32_t *line = fb + (uint64_t)(y + row * scale + sy) * (stride / 4u);
++					for (uint32_t sx = 0; sx < scale; sx++) {
++						line[dx + col * scale + sx] = 0xffffffffu;
++					}
++				}
++			}
++		}
++	}
++	__asm__ volatile ("dsb sy" ::: "memory");
++}
++
++/*
++ * Panic path (called from panic_spin_forever): freeze the heartbeat and
++ * stackdump redraws, then draw the panicking thread's frame-pointer chain as
++ * up to 12 dense lines at rows 2400+60*i, innermost first — a photo then
++ * carries the whole backtrace instead of one panic line.
++ */
++void
++sweet_stage_panic_backtrace(void)
++{
++	boot_args *args = sweet_stage_args;
++	uint64_t fp;
++
++	if (args == NULL) {
++		return;
++	}
++	sweet_stage_panic_freeze = 1;
++	__asm__ volatile ("dsb sy" ::: "memory");
++
++	{
++		/* One clean layout: clear everything below the console strip first. */
++		uint64_t base = sweet_stage_fb_va ? sweet_stage_fb_va : args->Video.v_baseAddr;
++		uint32_t stride = (uint32_t)args->Video.v_rowBytes;
++		if (base != 0 && stride >= 4) {
++			volatile uint32_t *fb = (volatile uint32_t *)(uintptr_t)base;
++			for (unsigned int y = 2360; y < args->Video.v_height; y++) {
++				volatile uint32_t *line = fb + (uint64_t)y * (stride / 4u);
++				for (uint32_t x = 0; x < 16 * 6 * 12 + 32; x++) {
++					line[x] = 0;
++				}
++			}
++			__asm__ volatile ("dsb sy" ::: "memory");
++		}
++	}
++
++	fp = (uint64_t)(uintptr_t)__builtin_frame_address(0);
++	for (unsigned int i = 0; i < 12 && fp != 0; i++) {
++		if ((fp & 7) != 0 || (fp >> 48) != 0xffff) {
++			break;
++		}
++		sweet_stage_backline(args, *(volatile uint64_t *)(fp + 8), 2400 + 60 * i);
++		fp = *(volatile uint64_t *)fp;
++	}
 +}
 +
 +/* Four values in the upper strip, out of the heartbeat sampler's rows. */
@@ -12785,7 +13002,7 @@ index 0000000..92f70b4
 +#endif
 +#endif
 diff --git a/osfmk/kern/debug.c b/osfmk/kern/debug.c
-index e9daeed..33c0cc7 100644
+index e9daeed..19be1b1 100644
 --- a/osfmk/kern/debug.c
 +++ b/osfmk/kern/debug.c
 @@ -1134,6 +1134,17 @@ panic_trap_to_debugger(const char *panic_format_str, va_list *panic_args, unsign
@@ -12817,13 +13034,17 @@ index e9daeed..33c0cc7 100644
  	panic_stop();
  	__builtin_unreachable();
  }
-@@ -1240,6 +1255,10 @@ void
+@@ -1240,6 +1255,14 @@ void
  panic_spin_forever(void)
  {
  	for (;;) {
 +		{
 +			extern void sweet_stage_faultredraw(void);
 +			sweet_stage_faultredraw();
++		}
++		{
++			extern void sweet_stage_panic_backtrace(void);
++			sweet_stage_panic_backtrace();
 +		}
  #if defined(__arm__) || defined(__arm64__)
  		/* On arm32, which doesn't have a WFE timeout, this may not return.  But that should be OK on this path. */

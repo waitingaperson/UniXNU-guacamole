@@ -310,3 +310,42 @@ cumulative patch has been re-applied somewhere.
     itself under `!XNU_MONITOR`. The panic path also draws the panicking
     thread's 12-frame backtrace once (0988) after clearing the strip below the
     console, so a photo carries the whole trail.
+12. 2026-10-26, documented owner-root chain on Linux: the rootfs tracking
+    flow the UniXNU docs describe (owner signs the root policy; the kernel
+    accepts a readonly root only on owner-verified block storage) is now
+    buildable without macOS:
+    - `scripts/build-owner-policy-linux.py` replaces the hdiutil/diskutil
+      attach with the UDIF decoder and pins the exact inputs (OS
+      6077580800/04769D26…/e5634d04…, SystemOS 3303014400/8846FE78…/
+      b4908cde…), hashes every 4 KiB block, signs the VROOT01 envelope with
+      the RSA-3072 owner key (OpenSSL, generated on first use) and re-verifies
+      the finished manifest. Both policies PASS: 1483785 and 806400 blocks,
+      OS tail 1536 bytes.
+    - `scripts/pack-verified-root.py` packs both envelopes plus the shared
+      anchor into `build/verified-root-xnu/libVerifiedRootProbe.a`
+      (73287008 manifest bytes) through the kernel compile recipe, and the
+      build links it with `-force_load` when `XNU_VERIFIED_ROOT_PROBE=1`.
+    - `NativeUfs` is now built with `NATIVE_VERIFIED_BLOCK=1` +
+      `NATIVE_VERIFIED_BLOCK_MULTI_POLICY=1`: it selects the single
+      capacity-matching policy per window, protects the manifest/key in
+      read-only kernel memory, verifies every read block against the signed
+      table, and exports the UFS variant of
+      `native_verified_block_root_authorized` (IOMedia → UUID → provider
+      chain → `native_ufs_block_authenticates`) for bsd_init.
+    - defconfig: `XNU_VERIFIED_ROOT_PROBE/AUDIT/TRUST=y` (the crypto
+      prerequisites, source corecrypto14 and prelinked bootstrap, were
+      already on). The bootstrap pass compiles the owner decision out (it
+      links before the archives exist) and the full pass recompiles and
+      links it; the Virtio-only gate now accepts the UFS transport.
+    - Verified artifacts: the prelinked kernel is 124391424 bytes and
+      contains exactly two VROOT01 headers (6077580800/1483785 and
+      3303014400/806400) plus `_native_ufs_block_authenticates`,
+      `_native_verified_block_root_authorized`, `native_verified_root_probe`
+      and `_verified_root_policy_count`; bsd_init.o is stamped 1:1:1
+      (probe/audit/trust) and the kernel carries the audit/trust globals.
+      The 160 MiB payload pushes the boot image to 173006848 bytes, so
+      `board.toml` moves the ramdisk field above the DBI MMIO window to
+      physical 0x84000000-0x8e400000 (still below the 0x9c000000 DarwinBoot
+      window).
+    Runtime boot with the signed policies is the next verification step
+    (hardware).

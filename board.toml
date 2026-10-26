@@ -131,7 +131,7 @@ roots = [
 
 [payload]
 volume = "GUACESP"
-size_mib = 64
+size_mib = 160
 loader = "firmware"
 title = "OnePlus 7 Pro - XNU"
 dram_size = "0xc0000000"
@@ -193,7 +193,10 @@ kernel_offset = 0x8000
 # past the 0x82A00000 end of the reserved Kernel region into the DBI MMIO
 # window, so the ABL does not load it. 0x800000 puts it at
 # 0x80800000-0x82800000, after the ~5 MiB kernel/DTB and inside the region.
-ramdisk_offset = 0x800000
+# The owner-signed kernel embeds ~73 MiB of block hashes, so the 160 MiB
+# payload no longer fits that region: it is placed above the DBI MMIO window
+# at 0x84000000-0x8E400000, still below the 0x9c000000 DarwinBoot window.
+ramdisk_offset = 0x4000000
 abl_base = 0x80000000
 tags_offset = 0x100
 pagesize = 4096

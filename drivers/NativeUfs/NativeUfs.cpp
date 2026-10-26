@@ -26,6 +26,7 @@ extern const uint8_t verified_root_key[];
 #include <IOKit/IOLib.h>
 #include <libkern/c++/OSData.h>
 #include <libkern/c++/OSString.h>
+#include <libkern/c++/OSDictionary.h>
 #include <libkern/libkern.h>
 #include <pexpert/pexpert.h>
 #include <kern/debug.h>
@@ -42,6 +43,10 @@ extern "C" {
 // Optional passive observer; absent in ordinary builds. It may run while a
 // window lock is held, so its contract forbids blocking or transport access.
 void boot_progress_poll (void) __attribute__((weak));
+// A linked boot-progress archive supplies the strong definition and overrides
+// this no-op. Without it the weak reference stays undefined, which the kernel
+// link rejects, so every build must carry one of the two.
+__attribute__((weak)) void boot_progress_poll (void) {}
 volatile uint32_t native_ufs_probe_calls = 0;
 volatile uint32_t native_ufs_matched = 0;
 volatile uint32_t native_ufs_probe_requested = 0;
@@ -1447,6 +1452,61 @@ extern "C" int native_ufs_block_authenticates (IOService *provider, const char *
     return -1;
   }
   return block->authenticatesVolume (uuid, digest) ? 1 : 0;
+}
+
+// Root acceptance for the mounted volume (bsd_init owner-root audit/trust):
+// resolve the mounted media by its BSD device, then require the UFS window
+// below it to authenticate the media's signed volume UUID. This is the
+// UFS-only counterpart of the virtio block transport's query.
+extern "C" int native_verified_block_root_authorized (dev_t device)
+{
+  OSDictionary *matching = IOService::serviceMatching ("IOMedia");
+  OSDictionary *properties = OSDictionary::withCapacity (2);
+  OSNumber *mjr = OSNumber::withNumber (static_cast<unsigned> (major (static_cast<uint32_t> (device))), 32);
+  OSNumber *mnr = OSNumber::withNumber (static_cast<unsigned> (minor (static_cast<uint32_t> (device))), 32);
+  if (!matching || !properties || !mjr || !mnr) {
+    OSSafeReleaseNULL (mnr);
+    OSSafeReleaseNULL (mjr);
+    OSSafeReleaseNULL (properties);
+    OSSafeReleaseNULL (matching);
+    return 0;
+  }
+  bool ready = properties->setObject (kIOBSDMajorKey, mjr) && properties->setObject (kIOBSDMinorKey, mnr) &&
+               matching->setObject ("IOPropertyMatch", properties);
+  mnr->release ();
+  mjr->release ();
+  properties->release ();
+  OSIterator *iterator = ready ? IOService::getMatchingServices (matching) : nullptr;
+  matching->release ();
+  if (!iterator) {
+    return 0;
+  }
+  bool authenticated = false;
+  unsigned matches = 0;
+  while (OSObject *object = iterator->getNextObject ()) {
+    IOService *media = OSDynamicCast (IOService, object);
+    if (!media) {
+      continue;
+    }
+    if (++matches != 1) {
+      authenticated = false;
+      break;
+    }
+    OSString *uuid = OSDynamicCast (OSString, media->getProperty ("UUID"));
+    if (!uuid || uuid->getLength () != 36) {
+      continue;
+    }
+    unsigned depth = 0;
+    for (IOService *provider = media; provider && depth++ < 64; provider = provider->getProvider ()) {
+      int ufs = native_ufs_block_authenticates (provider, uuid->getCStringNoCopy (), nullptr);
+      if (ufs >= 0) {
+        authenticated = ufs == 1;
+        break;
+      }
+    }
+  }
+  iterator->release ();
+  return authenticated && matches == 1;
 }
 #endif
 

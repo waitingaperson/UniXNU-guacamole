@@ -349,3 +349,29 @@ cumulative patch has been re-applied somewhere.
       window).
     Runtime boot with the signed policies is the next verification step
     (hardware).
+13. 2026-10-26, owner Data seed and the USB debug port:
+    - The owner Data seed is built on a macOS runner
+      (`scripts/build-data-seed-macos.sh` + `.github/workflows` seed job), packed
+      as DBRDISK1 (`scripts/packed_ramdisk.py`), shipped by the payload
+      (`--data-ramdisk data-seed.dbr`, ADT `PackedRAMDisk` + `persistent_data`)
+      and mounted read-write at `/private/var` by `native_owner_data_prepare`.
+      Confirmed on hardware: `GUAC-MEDIA: disk4 uuid 82AB0DD5-…` and the APFS
+      mount of the seed before the first exec.
+    - Kernel boot arguments are trimmed to the purposeful set (console/APFS/
+      board/userland), removing the historical `sweet*`, duplicate `debug=`,
+      and the obsolete `guac_skip_rootauth`.
+    - The verified-root chain still owns the storage path: ShengUfs publishes
+      both windows, every read authenticates, the owner decision and the union
+      SystemOS mount succeed; only the dyld shared-cache mapping into the
+      shared region remains before the userland.
+    - USB debug: `drivers/QcomXnuUsbDebug` is vendored (reference module from
+      xiaoleGun/QcomXnuUsbDebug) with a new `soc/Sm8150.h` profile
+      (DWC3 0x0a600000, GCC 0x00100000 usb3_prim 0xf010-0xf054, GDSCR 0xf004,
+      QSCRATCH 0xf8810, apps-SMMU 0x15000000, SID 0x0 unverified,
+      PSCI SMC reset unqualified). The archive builds against the 10063
+      compile record (`libQcomXnuUsbDebug.a`). Console/worker patches applied
+      to the tree with the following misses to finish by hand:
+      `osfmk/kern/printf.c` consdebug_putc/consdebug_putc_unbuffered hunks and
+      one `serial_console.c` hunk (`.rej` files kept in the work tree).
+      Remaining: per-file `-DXNU_QCOM_USB_DEBUG=1`, the include path, the
+      archive force-load, `qcom-usb-debug=1`, host `collect-xnu-usb.py`.

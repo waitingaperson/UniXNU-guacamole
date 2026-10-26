@@ -146,36 +146,26 @@ trust_cache_sha256 = [
   "7416ca4f8377146626bb284e2133c76bee6cb4e3ee0af5d648b186235a7323a7",
 ]
 kernel_args = [
+  # Console and diagnostics (the sheng reference set).
   "-v",
   "debug=0x14e",
-  "kt_fixed_zones=120",
-  "-apfs_shared_datavolume",
   "serial=3",
-  "cpus=1",
   "keepsyms=1",
-  "-enable_kprintf_spam",
-  "-noprogress",
+  "kt_fixed_zones=120",
+  # Root selection and the iOS APFS layout.
   "rd=uuid",
   "boot-uuid=04769D26-2CA0-4825-B443-E2E5F88300F2",
-  "unentitled_ios_sim_launch=1",
-  "ignition_level=1",
-  "wdt_test=no_user_checkin",
-  "ufsrw=1",
-  "rootrw=1",
-  "launchd_unsecure_cache=1",
-  "wdt=-1",
-  "sweetusb=0",
-  "sweettouchdelay=20",
-  "sweetfb_noconsole=1",
-  "sweetfb_hz=30",
-  "sweetgpu=3",
-  "sweetlogdump=1",
-  "guac_skip_rootauth=1",
+  "-apfs_shared_datavolume",
   "native-ufs-root=1",
+  # Board integration.
   "sheng-pmgr=2",
   "kernel_stack_pages=16",
-  "allow-root-hash-mismatch=1",
+  # Userland bring-up.
+  "launchd_unsecure_cache=1",
+  "ignition_level=1",
+  "wdt=-1",
   "root-live-fs=1",
+  "allow-root-hash-mismatch=1",
 ]
 
 [payload.adt]

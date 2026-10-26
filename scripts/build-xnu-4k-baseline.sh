@@ -512,9 +512,11 @@ if [ "$OWNER_DATA_MOUNT" != 0 ] && [ "$OWNER_DATA_MOUNT" != 1 ]; then
   echo 'XNU_OWNER_DATA_MOUNT must be 0 or 1' >&2
   exit 1
 fi
-if [ "$OWNER_DATA_MOUNT" = 1 ] && [ "$OWNER_BOOT_MANIFEST" != 1 ]; then
-  echo 'Scratch Data requires authenticated original OS/owner metadata startup' >&2
-  exit 1
+# The guacamole bootloader's /chosen already carries the firmware identity, so
+# the owner manifest publication is refused by design (status 3); the Data seed
+# mount is independent of it.
+if [ "$OWNER_DATA_MOUNT" = 1 ] && [ "$OWNER_BOOT_MANIFEST" = 1 ]; then
+  echo 'note: owner boot manifest stays disabled while /chosen carries the firmware identity' >&2
 fi
 OWNER_DATA_HEADER=$ROOT/build/xnu/owner-data-volume.h
 python3 - "$OWNER_DATA_HEADER" "$OWNER_DATA_EFF" "$NATIVE_RAM_BLOCK" "${XNU_OWNER_DATA_VOLUME_UUID:-}" <<'PY_DATA_UUID'
@@ -801,6 +803,7 @@ PY_GPU_BROKER
     KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $CONSOLE_ARCHIVE"
   fi
   if [ "$NATIVE_RAM_BLOCK" = 1 ]; then
+    python3 scripts/build-arm-driver.py NativeRamBlock
     RAM_BLOCK_ARCHIVE=$ROOT/build/native-ram-block/libNativeRamBlock.a
     test -f "$RAM_BLOCK_ARCHIVE"
     if [ "${XNU_NATIVE_VIRTIO_BLOCK:-0}" = 1 ]; then

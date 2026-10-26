@@ -38,7 +38,8 @@ python3 scripts/pack-trust-bundle.py \
   --output out/guacamole/payload/trust.bundle
 
 ./unixnu/unixnu build payload --kernel "$OUT" --unique-chip-id 0x5357454554000001 \
-  --trust-cache out/guacamole/payload/trust.bundle -D .
+  --trust-cache out/guacamole/payload/trust.bundle -D . \
+  --data-ramdisk data-seed.dbr
 
 python3 scripts/build-bootimg.py \
   --fd uefi/Build/SurfaceDuo1Pkg/DEBUG_CLANGPDB/FV/SM8150_EFI.fd \

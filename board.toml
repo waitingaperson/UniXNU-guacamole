@@ -180,6 +180,8 @@ kernel_args = [
 
 [payload.adt]
 tool = "scripts/make-guacamole-adt.py"
+packed_data_ramdisk = true
+persistent_data = true
 unique_chip_id = "required"
 ipad_identity = true
 chip_id = "207"

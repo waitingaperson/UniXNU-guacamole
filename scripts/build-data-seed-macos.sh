@@ -16,7 +16,7 @@ REPO=$(cd "$(dirname "$0")/.." && pwd)
 mkdir -p "$OUT"
 OUT=$(cd "$OUT" && pwd)
 WORK=$(mktemp -d)
-trap 'hdiutil detach "$MOUNT" >/dev/null 2>&1 || true; rm -rf "$WORK"' EXIT
+trap 'cd /; hdiutil detach "$MOUNT" -force >/dev/null 2>&1 || true; rm -rf "$WORK"' EXIT
 
 echo "== creating APFS container image ($SIZE)"
 hdiutil create -size "$SIZE" -fs APFS -volname "$VOLNAME" -nospotlight -quiet "$WORK/data.dmg"
@@ -96,6 +96,7 @@ chmod 0755 log backups || true
 echo "== reading the volume identity"
 VOLUME_UUID=$(diskutil info -plist "$MOUNT" | plutil -extract VolumeUUID raw -)
 VOLUME_NAME=$(diskutil info -plist "$MOUNT" | plutil -extract VolumeName raw -)
+cd "$REPO"
 UNMOUNTED=0
 hdiutil detach "$MOUNT" -quiet && UNMOUNTED=1
 
@@ -120,5 +121,5 @@ report = dict(volume_uuid=uuid.upper(), volume_name=name, seed=dbr.name,
 (out / 'data-seed.json').write_text(json.dumps(report, indent=2) + '\n')
 print('PASS: data seed', report['volume_uuid'], report['seed_sha256'], report['seed_bytes'])
 PY
-if [ "$UNMOUNTED" = 0 ]; then hdiutil detach "$MOUNT" -quiet || true; fi
+if [ "$UNMOUNTED" = 0 ]; then hdiutil detach "$MOUNT" -force -quiet || true; fi
 ls -la "$OUT"

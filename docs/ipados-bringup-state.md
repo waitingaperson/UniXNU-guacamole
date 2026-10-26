@@ -273,8 +273,14 @@ cumulative patch has been re-applied somewhere.
    `virtual-timer-intid` from the ADT intc node (27 stays the QEMU/sheng
    default), the ADT carries `redistributor-stride` 0x20000, and slot 3 draws
    the timer count / GIC-ready / registered / INTID state. Hardware boot:
-   the panic went away and the boot advanced past `bsd_utaskbootstrap`; the
-   next wall was a userspace panic (entry 9).
+   the panic went away and the boot advanced past `bsd_utaskbootstrap`.
+   Hardware readout of slot 3 after the fix: `0x0133…` with the low digits
+   rising — INTID 19, GIC ready and CPU registered all set, timer interrupts
+   counted — so the deadline wake is proven on the phone. The media-scan field
+   shows 4 media, `disk0`, 6,077,563,392 bytes (storage chain healthy). The
+   next walls were the userspace ones (entries 9-11); with those fixed the
+   boot now reaches the launchd/libignition userspace bootstrap and waits
+   there (no panic; last log line mentions `libignition`).
 9. 2026-10-26, trust bundle: the IPSW trust caches are IM4P/DER containers
    (`trst` OS, `trcs` Cryptex1,SystemOS); DarwinBoot's ValidTrustCaches
    requires the module-table bundle, so the raw files were refused with

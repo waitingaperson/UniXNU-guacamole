@@ -109,10 +109,22 @@ if [ "$BOOTSTRAP" != 0 ] && [ "$BOOTSTRAP" != 1 ]; then
   echo 'XNU_BOOTSTRAP must be 0 or 1' >&2
   exit 1
 fi
+# The bootstrap pass links before the ShengUfs archive exists, so it compiles
+# the owner-cache path out; the full pass recompiles with the real modes.
 if [ "$BOOTSTRAP" = 1 ]; then
-  # The full pass compiles sweet_ufs.c with the GuacMedia reference; rebuild it
-  # here without it, since the bootstrap link carries no board archives.
-  touch .cache/xnu-work/bsd/dev/sweet_ufs.c
+  OWNER_CACHE_EFF=0
+  OWNER_CACHE_STARTUP_EFF=0
+  OWNER_BOOT_MANIFEST_EFF=0
+  OWNER_DATA_EFF=0
+  OWNER_CRYPTEX_EFF=0
+  OWNER_UNION_EFF=0
+else
+  OWNER_CACHE_EFF=${XNU_OWNER_CACHE_MOUNT:-0}
+  OWNER_CACHE_STARTUP_EFF=${XNU_OWNER_CACHE_STARTUP:-0}
+  OWNER_BOOT_MANIFEST_EFF=${XNU_OWNER_BOOT_MANIFEST:-0}
+  OWNER_DATA_EFF=${XNU_OWNER_DATA_MOUNT:-0}
+  OWNER_CRYPTEX_EFF=${XNU_OWNER_CRYPTEX_FILES:-0}
+  OWNER_UNION_EFF=${XNU_OWNER_UNION_SYSTEMOS:-0}
 fi
 if [ "$BOOTSTRAP" = 0 ]; then
   # The b6ae99c driver builds these between passes; the current main driver
@@ -407,10 +419,16 @@ if [ "$GUAC_SYSTEMOS_MOUNT" != 0 ] && [ "$GUAC_SYSTEMOS_MOUNT" != 1 ]; then
   echo 'XNU_GUAC_SYSTEMOS_MOUNT must be 0 or 1' >&2
   exit 1
 fi
+# The cryptex hook resolves its volume finder from the ShengUfs archive, which
+# the bootstrap pass does not link yet.
+GUAC_SYSTEMOS_EFFECTIVE=$GUAC_SYSTEMOS_MOUNT
+if [ "$BOOTSTRAP" = 1 ]; then
+  GUAC_SYSTEMOS_EFFECTIVE=0
+fi
 GUAC_SYSTEMOS_STAMP=$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/.guac-systemos-mount-mode
-if [ "$(cat "$GUAC_SYSTEMOS_STAMP" 2>/dev/null || echo 0)" != "$GUAC_SYSTEMOS_MOUNT" ]; then
+if [ "$(cat "$GUAC_SYSTEMOS_STAMP" 2>/dev/null || echo 0)" != "$GUAC_SYSTEMOS_EFFECTIVE" ]; then
   rm -f "$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/bsd/DEVELOPMENT/kern_exec.o"
-  printf '%s\n' "$GUAC_SYSTEMOS_MOUNT" > "$GUAC_SYSTEMOS_STAMP"
+  printf '%s\n' "$GUAC_SYSTEMOS_EFFECTIVE" > "$GUAC_SYSTEMOS_STAMP"
 fi
 SHENG_PMGR=${XNU_SHENG_PMGR:-0}
 if [ "$SHENG_PMGR" != 0 ] && [ "$SHENG_PMGR" != 1 ]; then
@@ -475,12 +493,12 @@ if [ "$OWNER_BOOT_MANIFEST" = 1 ] && [ "$OWNER_CACHE_STARTUP" != 1 ]; then
   echo 'Owner boot metadata requires real authenticated owner root/cache startup' >&2
   exit 1
 fi
-EXTRA_MAKE_ARGS+=("IOKitBSDInit.cpo_CFLAGS_ADD=-DXNU_OWNER_BOOT_MANIFEST=$OWNER_BOOT_MANIFEST")
+EXTRA_MAKE_ARGS+=("IOKitBSDInit.cpo_CFLAGS_ADD=-DXNU_OWNER_BOOT_MANIFEST=$OWNER_BOOT_MANIFEST_EFF")
 OWNER_MANIFEST_STAMP=$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/.owner-boot-manifest-mode
-if [ "$(cat "$OWNER_MANIFEST_STAMP" 2>/dev/null || echo 0)" != "$OWNER_BOOT_MANIFEST" ]; then
+if [ "$(cat "$OWNER_MANIFEST_STAMP" 2>/dev/null || echo 0)" != "$OWNER_BOOT_MANIFEST_EFF" ]; then
   rm -f "$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/iokit/DEVELOPMENT/IOKitBSDInit.cpo"
   rm -f "$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/bsd/DEVELOPMENT/kern_exec.o"
-  printf '%s\n' "$OWNER_BOOT_MANIFEST" > "$OWNER_MANIFEST_STAMP"
+  printf '%s\n' "$OWNER_BOOT_MANIFEST_EFF" > "$OWNER_MANIFEST_STAMP"
 fi
 OWNER_DATA_MOUNT=${XNU_OWNER_DATA_MOUNT:-0}
 if [ "$OWNER_DATA_MOUNT" != 0 ] && [ "$OWNER_DATA_MOUNT" != 1 ]; then
@@ -492,7 +510,7 @@ if [ "$OWNER_DATA_MOUNT" = 1 ] && [ "$OWNER_BOOT_MANIFEST" != 1 ]; then
   exit 1
 fi
 OWNER_DATA_HEADER=$ROOT/build/xnu/owner-data-volume.h
-python3 - "$OWNER_DATA_HEADER" "$OWNER_DATA_MOUNT" "$NATIVE_RAM_BLOCK" "${XNU_OWNER_DATA_VOLUME_UUID:-}" <<'PY_DATA_UUID'
+python3 - "$OWNER_DATA_HEADER" "$OWNER_DATA_EFF" "$NATIVE_RAM_BLOCK" "${XNU_OWNER_DATA_VOLUME_UUID:-}" <<'PY_DATA_UUID'
 from pathlib import Path
 import sys
 import uuid
@@ -509,9 +527,9 @@ if not path.exists() or path.read_text() != text:
     path.write_text(text)
 PY_DATA_UUID
 OWNER_DATA_STAMP=$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/.owner-data-mount-mode
-if [ "$(cat "$OWNER_DATA_STAMP" 2>/dev/null || echo 0)" != "$OWNER_DATA_MOUNT:$NATIVE_RAM_BLOCK" ]; then
+if [ "$(cat "$OWNER_DATA_STAMP" 2>/dev/null || echo 0)" != "$OWNER_DATA_EFF:$NATIVE_RAM_BLOCK" ]; then
   rm -f "$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/bsd/DEVELOPMENT/kern_exec.o"
-  printf '%s\n' "$OWNER_DATA_MOUNT:$NATIVE_RAM_BLOCK" > "$OWNER_DATA_STAMP"
+  printf '%s\n' "$OWNER_DATA_EFF:$NATIVE_RAM_BLOCK" > "$OWNER_DATA_STAMP"
 fi
 OWNER_CRYPTEX_FILES=${XNU_OWNER_CRYPTEX_FILES:-0}
 if [ "$OWNER_CRYPTEX_FILES" != 0 ] && [ "$OWNER_CRYPTEX_FILES" != 1 ]; then
@@ -523,9 +541,9 @@ if [ "$OWNER_CRYPTEX_FILES" = 1 ] && [ "$OWNER_CACHE_STARTUP" != 1 ]; then
   exit 1
 fi
 OWNER_CRYPTEX_STAMP=$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/.owner-cryptex-files-mode
-if [ "$(cat "$OWNER_CRYPTEX_STAMP" 2>/dev/null || echo 0)" != "$OWNER_CRYPTEX_FILES" ]; then
+if [ "$(cat "$OWNER_CRYPTEX_STAMP" 2>/dev/null || echo 0)" != "$OWNER_CRYPTEX_EFF" ]; then
   rm -f "$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/bsd/DEVELOPMENT/kern_exec.o"
-  printf '%s\n' "$OWNER_CRYPTEX_FILES" > "$OWNER_CRYPTEX_STAMP"
+  printf '%s\n' "$OWNER_CRYPTEX_EFF" > "$OWNER_CRYPTEX_STAMP"
 fi
 OWNER_UNION_SYSTEMOS=${XNU_OWNER_UNION_SYSTEMOS:-0}
 if [ "$OWNER_UNION_SYSTEMOS" != 0 ] && [ "$OWNER_UNION_SYSTEMOS" != 1 ]; then
@@ -537,9 +555,9 @@ if [ "$OWNER_UNION_SYSTEMOS" = 1 ] && { [ "$OWNER_CACHE_STARTUP" != 1 ] || [ "$O
   exit 1
 fi
 OWNER_UNION_STAMP=$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/.owner-union-systemos-mode
-if [ "$(cat "$OWNER_UNION_STAMP" 2>/dev/null || echo 0)" != "$OWNER_UNION_SYSTEMOS" ]; then
+if [ "$(cat "$OWNER_UNION_STAMP" 2>/dev/null || echo 0)" != "$OWNER_UNION_EFF" ]; then
   rm -f "$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/bsd/DEVELOPMENT/kern_exec.o"
-  printf '%s\n' "$OWNER_UNION_SYSTEMOS" > "$OWNER_UNION_STAMP"
+  printf '%s\n' "$OWNER_UNION_EFF" > "$OWNER_UNION_STAMP"
 fi
 NATIVE_AIR_INIT=${XNU_NATIVE_AIR_INIT:-0}
 if [ "$NATIVE_AIR_INIT" != 0 ] && [ "$NATIVE_AIR_INIT" != 1 ]; then
@@ -555,7 +573,7 @@ if [ "$(cat "$NATIVE_AIR_STAMP" 2>/dev/null || echo 0)" != "$NATIVE_AIR_INIT" ];
   rm -f "$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/bsd/DEVELOPMENT/kern_exec.o"
   printf '%s\n' "$NATIVE_AIR_INIT" > "$NATIVE_AIR_STAMP"
 fi
-EXTRA_MAKE_ARGS+=("kern_exec.o_CFLAGS_ADD=-DXNU_NATIVE_AIR_INIT=$NATIVE_AIR_INIT -DXNU_OWNER_CACHE_MOUNT=$OWNER_CACHE_MOUNT -DXNU_OWNER_CACHE_STARTUP=$OWNER_CACHE_STARTUP -DXNU_OWNER_BOOT_MANIFEST=$OWNER_BOOT_MANIFEST -DXNU_OWNER_DATA_MOUNT=$OWNER_DATA_MOUNT -DXNU_NATIVE_RAM_BLOCK=$NATIVE_RAM_BLOCK -DXNU_OWNER_CRYPTEX_FILES=$OWNER_CRYPTEX_FILES -DXNU_OWNER_UNION_SYSTEMOS=$OWNER_UNION_SYSTEMOS -DXNU_GUAC_SYSTEMOS_MOUNT=$GUAC_SYSTEMOS_MOUNT -include $OWNER_DATA_HEADER")
+EXTRA_MAKE_ARGS+=("kern_exec.o_CFLAGS_ADD=-DXNU_NATIVE_AIR_INIT=$NATIVE_AIR_INIT -DXNU_OWNER_CACHE_MOUNT=$OWNER_CACHE_EFF -DXNU_OWNER_CACHE_STARTUP=$OWNER_CACHE_STARTUP_EFF -DXNU_OWNER_BOOT_MANIFEST=$OWNER_BOOT_MANIFEST_EFF -DXNU_OWNER_DATA_MOUNT=$OWNER_DATA_EFF -DXNU_NATIVE_RAM_BLOCK=$NATIVE_RAM_BLOCK -DXNU_OWNER_CRYPTEX_FILES=$OWNER_CRYPTEX_EFF -DXNU_OWNER_UNION_SYSTEMOS=$OWNER_UNION_EFF -DXNU_GUAC_SYSTEMOS_MOUNT=$GUAC_SYSTEMOS_EFFECTIVE -include $OWNER_DATA_HEADER")
 OWNER_CACHE_STAMP=$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/.owner-cache-mount-mode
 if [ "$(cat "$OWNER_CACHE_STAMP" 2>/dev/null || echo 0:0)" != "$OWNER_CACHE_MOUNT:$OWNER_CACHE_STARTUP" ]; then
   rm -f "$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/bsd/DEVELOPMENT/kern_exec.o"
@@ -683,21 +701,13 @@ if [ "${XNU_SOURCE_CORECRYPTO14:-0}" = 1 ] && [ "$BOOTSTRAP" = 0 ]; then
   fi
   # The SM8150 UFS root driver is built into the kernel (bsd/dev/sweet_ufs.c);
   # the external NativeUfs IOKit archive is not part of this configuration.
-  GUAC_MEDIA_ARCHIVE=$ROOT/build/guac-media/libGuacMedia.a
-  test -f "$GUAC_MEDIA_ARCHIVE"
-  KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES -Wl,-force_load,$GUAC_MEDIA_ARCHIVE"
-  EXTRA_CFLAGS="$EXTRA_CFLAGS -DXNU_GUACMEDIA=1"
-  touch .cache/xnu-work/bsd/dev/sweet_ufs.c
-  KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $GUAC_MEDIA_ARCHIVE"
-  # The root window as an IOBlockStorageDevice, so IOStorageFamily publishes
-  # the IOMedia that APFS's mount root requires.
-  python3 scripts/build-arm-driver.py GuacUfsMedia
-  GUAC_UFS_MEDIA_ARCHIVE=$ROOT/build/guac-ufs-media/libGuacUfsMedia.a
-  test -f "$GUAC_UFS_MEDIA_ARCHIVE"
+  # Storage is ShengUfs (NativeUfs) alone, per docs/zh/porting/ufs: it takes
+  # over the controller and publishes every SHNGROOT window as an IOMedia.
+  # The storage ABI bindings resolve the prelinked IOStorageFamily methods.
+  mkdir -p "$ROOT/build/storage-abi-bindings"
   $CROSS_CLANG -c -target arm64-apple-ios17.0 scripts/data/native-storage-bindings.S \
-    -o "$ROOT/build/guac-ufs-media/native-storage-bindings.o"
-  KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES $ROOT/build/guac-ufs-media/native-storage-bindings.o -Wl,-force_load,$GUAC_UFS_MEDIA_ARCHIVE"
-  KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $GUAC_UFS_MEDIA_ARCHIVE"
+    -o "$ROOT/build/storage-abi-bindings/native-storage-bindings.o"
+  KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES $ROOT/build/storage-abi-bindings/native-storage-bindings.o"
   if [ "${XNU_TEST_NATIVEUFS:-0}" = 1 ]; then
     if [ "$OWNER_ROOT_PROBE" = 1 ]; then
       python3 scripts/build-arm-driver.py NativeUfs --verified-root --verified-root-bundle

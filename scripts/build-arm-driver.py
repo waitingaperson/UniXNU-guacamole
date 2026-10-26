@@ -18,7 +18,7 @@ if args.verified_root_bundle and not args.verified_root:
     parser.error('A policy bundle requires verified block mode')
 if args.verified_root_bundle and args.negative_verified_block:
     parser.error('Select either bundle policy qualification or the isolated DMA snapshot fault')
-if (args.verified_root or args.negative_verified_block) and args.component not in ('NativeVirtioBlock', 'NativeUfs'):
+if (args.verified_root or args.negative_verified_block) and args.component not in ('NativeVirtioBlock', 'NativeUfs', 'GuacUfsMedia'):
     parser.error('Verified block mode requires the concrete read-only block transport')
 if args.negative_verified_block and not args.verified_root:
     parser.error('The isolated input fault requires verified block mode')
@@ -81,6 +81,8 @@ if component == 'NativeUfs':
     if args.verified_root:
         command += ['-I', str(ROOT / 'kits/VerifiedRoot/include'),
                     '-DNATIVE_VERIFIED_BLOCK=1', '-DNATIVE_VERIFIED_BLOCK_MULTI_POLICY=1']
+if component == 'GuacUfsMedia' and args.verified_root:
+    command += ['-I', str(ROOT / 'kits/VerifiedRoot/include'), '-DGUAC_MEDIA_VERIFIED_ROOT=1']
 if component=='NativeOfflineGPU':
     command += ['-I',str(ROOT/'drivers/NativeVirtioConsole')]
 if component in ('NativeLegacyDisplay','NativeHidInput'):

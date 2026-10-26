@@ -19,10 +19,12 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# The guacamole boot partition is 96 MiB, so the policy uses 8 KiB blocks:
+# every byte stays covered and the table halves to 22.6 MiB.
 OS_PIN = dict(image_sha256='e5634d04a8ac35f024845f583394e0a35deb26a04cb0c00286a8674e25a9a4f2',
-              blocks_verified=1483785, sample_lengths=[4096, 4096, 4096, 1536])
+              blocks_verified=370947, sample_lengths=[16384, 16384, 16384, 1536])
 SYSTEMOS_PIN = dict(image_sha256='b4908cde41d23e6bc05e6af51a2c9eeb00cf0f863a6a18b1600c96a3fd70414f',
-                    blocks_verified=806400, sample_lengths=[4096, 4096, 4096, 4096])
+                    blocks_verified=201600, sample_lengths=[16384, 16384, 16384, 16384])
 OUT = ROOT / 'build/verified-root-xnu'
 HEADER_BYTES, SIGNATURE_BYTES = 160, 384
 
@@ -44,6 +46,8 @@ def load(directory, pin):
 
 
 def main():
+    # ShengUfs publishes every window only when all of them authenticate, so
+    # both envelopes ride in the kernel (8 KiB blocks keep it under 96 MiB).
     os_meta, key, manifest, os_bytes = load(ROOT / 'build/verified-root-os', OS_PIN)
     sys_meta, sys_key, sys_manifest, sys_bytes = load(ROOT / 'build/verified-root-systemos', SYSTEMOS_PIN)
     if sys_key != key or sys_meta['image_sha256'] == os_meta['image_sha256']:

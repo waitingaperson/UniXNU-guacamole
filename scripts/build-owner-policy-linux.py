@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts' / 'local-linux'))
 import udif  # noqa: E402
 
-BLOCK = 4096
+BLOCK = 16384
 HEADER = '<8s4I2Q16s32s32s32sQ'
 HEADER_BYTES = struct.calcsize(HEADER)
 SIGNATURE_BYTES = 384

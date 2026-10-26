@@ -68,8 +68,9 @@ fetch = ["KernelCache", "DeviceTree", "StaticTrustCache", "Cryptex1,SystemTrustC
 # docs/zh/guide/userdata) behind a manifest; the kernel's UFS driver exposes the
 # first window (OS) as the root block device and the partition scheme publishes
 # the APFS partition inside it.
-first_lba = 0x1b188
-last_lba = 0x58b787
+# Observed live by the NativeUfs probe=11 read of LUN 0 ("userdata" GPT entry).
+first_lba = 0x1db188
+last_lba = 0x3a907fa
 lba_bytes = 4096
 windows = [
   { name = "OS", component = "OS" },
@@ -166,7 +167,8 @@ kernel_args = [
   "sweetgpu=3",
   "sweetlogdump=1",
   "guac_skip_rootauth=1",
-  "native-ufs-probe=11",
+  "native-ufs-root=1",
+  "sheng-pmgr=2",
   "kernel_stack_pages=16",
   "allow-root-hash-mismatch=1",
   "root-live-fs=1",

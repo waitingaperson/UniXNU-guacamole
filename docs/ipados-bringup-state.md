@@ -214,9 +214,10 @@ git -C out/guacamole/tree/.cache/xnu-work2 apply <repo>/patches/xnu/zzz-current-
 ```
 
 The authoritative working tree is also committed in its own git repo
-(`out/guacamole/tree/.cache/xnu-work`, commit `35927f1`, the console-scroll
-commit on top of `a540820`). Do not delete it before the cumulative patch has
-been re-applied somewhere.
+(`out/guacamole/tree/.cache/xnu-work`, HEAD `eef255a` at the time of writing;
+the tree HEAD advances with every session, and `zzz-current-state.patch` is
+regenerated from it, currently ~517 KiB). Do not delete it before the
+cumulative patch has been re-applied somewhere.
 
 ## Session log: last experiments
 

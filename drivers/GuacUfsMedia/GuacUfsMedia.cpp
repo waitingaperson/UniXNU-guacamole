@@ -11,9 +11,9 @@
 #include <kern/debug.h>
 #include <kern/thread.h>
 
-extern "C" void sweet_stage_field(uint64_t, uint64_t, uint64_t, uint64_t);
 
 extern "C" int sweet_ufs_media_read(uint64_t off, void *dst, uint64_t len);
+extern "C" void sweet_stage_field(uint64_t, uint64_t, uint64_t, uint64_t);
 uint64_t guac_media_report[3] = {
 	0xdead0000ULL, 0, 0
 };

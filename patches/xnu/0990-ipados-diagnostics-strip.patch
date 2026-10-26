@@ -1,0 +1,26 @@
+diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
+index 46b11ba..946f99e 100644
+--- a/osfmk/arm64/sweet_stage.c
++++ b/osfmk/arm64/sweet_stage.c
+@@ -346,7 +346,7 @@ sweet_stage_slot(unsigned int slot, uint64_t value)
+ 	if (args == NULL || slot > 3) {
+ 		return;
+ 	}
+-	sweet_stage_hexline(args, value, 1850 + slot * 100);
++	sweet_stage_hexline(args, value, 2400 + slot * 100);
+ }
+ 
+ void
+@@ -357,8 +357,8 @@ sweet_stage_field(uint64_t a, uint64_t b, uint64_t c, uint64_t d)
+ 	if (args == NULL) {
+ 		return;
+ 	}
+-	sweet_stage_hexline(args, a, 1850);
+-	sweet_stage_hexline(args, b, 1950);
+-	sweet_stage_hexline(args, c, 2050);
+-	sweet_stage_hexline(args, d, 2150);
++	sweet_stage_hexline(args, a, 2400);
++	sweet_stage_hexline(args, b, 2500);
++	sweet_stage_hexline(args, c, 2600);
++	sweet_stage_hexline(args, d, 2700);
+ }

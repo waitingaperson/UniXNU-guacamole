@@ -1,9 +1,9 @@
 diff --git a/.guacamole-applied b/.guacamole-applied
 new file mode 100644
-index 0000000..ead08df
+index 0000000..26f1274
 --- /dev/null
 +++ b/.guacamole-applied
-@@ -0,0 +1,140 @@
+@@ -0,0 +1,141 @@
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0400-guacamole-ufs-root.patch 3b89686a58e3c73faa1144e3d5127ef47aeb15dd9018c3bd364aa0dd9a466db3
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0900-ipados-iorpc-kernel-declaration.patch 5d7c085fee35864280997b50552ed4d9c141bc41212d8c33146f6858930c218d
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0901-ipados-framebuffer-console.patch ebc54d1e2774f69f5e3fe6ce6e85a1f8f5ca8b7dec0879eeb4043d634131e2ad
@@ -143,7 +143,8 @@ index 0000000..ead08df
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0987-ipados-armcpu-slot.patch 71c88e3231f58d9d1b73b0cf178f8418b2affeebf2c643dfd417ddfe40d2b688
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0987-ipados-armcpu-slot.patch 3956b3f232c3aec2087ff319cefa568463d9b253688af359533e3e4fa48263a5
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0988-ipados-panic-backtrace.patch 0b731d4baa98eef49457be7d99c6f6d2844dd733bdc678401df95bedfbfeca0d
-+/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/zzz-current-state.patch 49b28a3386589ecbc78bf486c44a267f7cc2f7744a5987ca2b29435ee9d32dbb
++/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0989-ipados-ppl-preempt.patch 51d50d05aa978818879b8b3968188fae560e85010a0d21e2d00c71083afa1730
++/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/zzz-current-state.patch 2322e493e6dac8daaa267167a4f9464efcabc7ab30d5a760d6dd25a07b6bcae2
 diff --git a/EXTERNAL_HEADERS/CoreEntitlements/CoreEntitlements.h b/EXTERNAL_HEADERS/CoreEntitlements/CoreEntitlements.h
 index 60e7e8f..5831a6c 100644
 --- a/EXTERNAL_HEADERS/CoreEntitlements/CoreEntitlements.h
@@ -12351,7 +12352,7 @@ index d4909c7..9a5f645 100644
  	// Unmask external IRQs if we're restarting from non-retention WFI
 diff --git a/osfmk/arm64/sweet_stage.c b/osfmk/arm64/sweet_stage.c
 new file mode 100644
-index 0000000..46b11ba
+index 0000000..946f99e
 --- /dev/null
 +++ b/osfmk/arm64/sweet_stage.c
 @@ -0,0 +1,364 @@
@@ -12703,7 +12704,7 @@ index 0000000..46b11ba
 +	if (args == NULL || slot > 3) {
 +		return;
 +	}
-+	sweet_stage_hexline(args, value, 1850 + slot * 100);
++	sweet_stage_hexline(args, value, 2400 + slot * 100);
 +}
 +
 +void
@@ -12714,10 +12715,10 @@ index 0000000..46b11ba
 +	if (args == NULL) {
 +		return;
 +	}
-+	sweet_stage_hexline(args, a, 1850);
-+	sweet_stage_hexline(args, b, 1950);
-+	sweet_stage_hexline(args, c, 2050);
-+	sweet_stage_hexline(args, d, 2150);
++	sweet_stage_hexline(args, a, 2400);
++	sweet_stage_hexline(args, b, 2500);
++	sweet_stage_hexline(args, c, 2600);
++	sweet_stage_hexline(args, d, 2700);
 +}
 diff --git a/osfmk/bank/bank.c b/osfmk/bank/bank.c
 index 47a52b5..98c3f1e 100644

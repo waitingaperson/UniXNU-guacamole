@@ -1,6 +1,7 @@
 # iPadOS 17.7.11 / XNU 10063 bring-up state (guacamole)
 
-Last updated: 2026-10-25 (after the first live-fs root mount).
+Last updated: 2026-10-26 (rootfs redone per the UniXNU userdata docs; console
+scroll fixed).
 
 ## What already works
 
@@ -79,8 +80,11 @@ are idempotent. This is a deliberate deviation from the official model.
   `0913-...kext-init`, `native-dt-panic-region.patch`.
 - The APFS kext bytes are patched after `emit_prelink.py`; if the target
   kernelcache changes, re-derive the vtable and the two code sites.
-- Console does not scroll once the screen is full. Diagnostics must use the
-  framebuffer fields:
+- The text console scrolls since 0986 (`vcattach` allocates the paint buffer
+  once the VM is up and replays the early output); the kprintf log is now
+  readable across a full screen. The `sweet_stage_*` framebuffer fields are
+  fixed position by design (they do not scroll), so keep using them for
+  boot-stage markers and fault dumps:
   - `sweet_stage_slot(slot, value)` draws slot 0..3 at framebuffer rows
     1850/1950/2050/2150. Slot 0 = boot thread, slot 1 = `bsdinit_task`,
     slot 2 = exec.
@@ -103,10 +107,52 @@ are idempotent. This is a deliberate deviation from the official model.
 | 43/44/45/46/47/50 (slot 1) | bsdinit_task: entry, current_proc, process_name, vm_init_before_launchd, bsd_do_post, before load_init_program |
 | 60/61/80/90 (slot 2) | load_init_program loop and exec failure |
 
+## Rootfs per the UniXNU userdata docs (2026-10-26)
+
+The userdata rootfs now follows <https://unixnu.com/zh/guide/userdata>: the
+image holds the UNCHANGED `OS` and `Cryptex1,SystemOS` disk images of the
+IPSW — whole disk images, the OS one including its own GPT — behind the
+SHNGROOT manifest, instead of the previously flashed image that stripped each
+disk image down to its Apple APFS partition.
+
+- Builder: `scripts/build-userdata-root.py` (Linux; reads the DMGs with
+  `scripts/local-linux/udif.py`, resolves IPSW members and verifies them
+  against board.toml `[ipsw.sha256]` through the upstream
+  `unixnu/scripts/unixnu/ipsw.py` Ipsw helper, refuses images larger than the
+  partition, writes `userdata-root.json` with the documented fields). The old
+  APFS-slice builder `build-userdata-shngroot.py` was removed.
+- Built image: `out/guacamole/userdata/userdata-root.img` — 9,382,658,048
+  bytes (8.74 GiB) in the 21.76 GiB partition: manifest at 0, OS window
+  6,077,580,800 bytes at 0x100000, SystemOS window 3,303,014,400 bytes at
+  0x16a600000. The SystemOS window hash matches the IPSW pin; the OS window
+  begins with the disk image's own protective MBR + GPT and the APFS partition
+  sits at window offset 0x4400 (LBA 34).
+- The APFS partition bytes are IDENTICAL to the previously flashed slice
+  (verified byte for byte against `out/guacamole/userdata/userdata-shngroot.img`),
+  so the mounted volume UUID is still `04769D26-2CA0-4825-B443-E2E5F88300F2`
+  and no ADT/boot-arg change is needed.
+- Kernel side needs nothing: sweet_ufs only reads the manifest at partition
+  block 0 and serves the window bytes as-is; the prelinked IOStorageFamily
+  carries `IOGUIDPartitionScheme` with `IOPropertyMatch {"Whole"=true}`,
+  probe 0xfa0 and `Content Mask GUID_partition_scheme` (verified in the
+  `__PRELINK_INFO` of `out/ipsw/kernelcache.decompressed`), so the scheme cuts
+  the APFS partition out of the whole-image window and apfs claims exactly the
+  bytes it already mounted in the live-root boot.
+- `rd=` stays absent (UUID root-matching); `rd=ufsroot0`/`rd=disk0` would now
+  resolve to the whole GPT media and fail.
+- Data volume: the docs' Data ramdisk seed (`--data-ramdisk`, grown with
+  `scripts/seed-data-grow.py`) still needs macOS `hdiutil`/`diskutil` and is
+  not wired yet; the current boot does not reach it (process 1 never runs).
+
+The phone still runs the old slice image; `fastboot flash userdata
+out/guacamole/userdata/userdata-root.img` is required before the next boot.
+
 ## Useful commands
 
 ```sh
 ./scripts/build-local-linux.sh                     # kernel + prelink + payload + image
+python3 scripts/build-userdata-root.py \
+  --ipsw '/home/invalidname/下载/iPad_Pro_HFR_17.7.11_21H461_Restore.ipsw'   # docs layout userdata
 fastboot boot out/guacamole/boot/boot-32-ipados-local.img
 python3 scripts/patch-apfs-rootauth.py <prelinked.macho>   # idempotent
 ```
@@ -117,6 +163,10 @@ Boot args currently relevant: `root-live-fs=1`,
 
 ## Next steps
 
+0. Flash the docs-layout userdata (`fastboot flash userdata
+   out/guacamole/userdata/userdata-root.img`), then boot the current image:
+   one boot answers both the `IOSleep(100)` experiment (slot 1 fields) and
+   the scrolling console.
 1. Observe the `IOSleep(100)` experiment: does `bsdinit_task` (slot 1)
    start? If yes, the yield was the gate; keep a sleep or a proper wakeup.
 2. If the init thread never runs, port the documented platform pieces
@@ -146,8 +196,9 @@ git -C out/guacamole/tree/.cache/xnu-work2 apply <repo>/patches/xnu/zzz-current-
 ```
 
 The authoritative working tree is also committed in its own git repo
-(`out/guacamole/tree/.cache/xnu-work`, commit `a540820`). Do not delete it
-before the cumulative patch has been re-applied somewhere.
+(`out/guacamole/tree/.cache/xnu-work`, commit `35927f1`, the console-scroll
+commit on top of `a540820`). Do not delete it before the cumulative patch has
+been re-applied somewhere.
 
 ## Session log: last experiments
 
@@ -160,3 +211,19 @@ before the cumulative patch has been re-applied somewhere.
 3. If slot 1 still shows nothing, port the platform pieces from the
    reference UniXNU-sheng sources (`ArmDTPlatform`, `ArmCpu` timer/GIC/IPI,
    SMMU) as the docs require, instead of extending the 8796-era patches.
+4. 2026-10-26, rootfs: the userdata image was rebuilt per the UniXNU docs —
+   whole `OS` + `SystemOS` disk images behind the SHNGROOT manifest
+   (`scripts/build-userdata-root.py`; the old APFS-slice builder was
+   removed). The decoded OS window matches the previously flashed slice byte
+   for byte from the APFS partition on; the new bytes only prepend the disk
+   image's own GPT, which the prelinked `IOGUIDPartitionScheme` cuts out
+   (personality verified in the kernelcache `__PRELINK_INFO`). Needs a
+   `fastboot flash userdata` before the next boot.
+5. 2026-10-26, console: the console overwrote its last row because the only
+   `gc_enable(TRUE)` ran before the VM was up (paint buffer allocation
+   skipped, `gc_scroll_up` early-returns on `!gc_buffer_size`), and every
+   post-VM path (`vcattach` with `gc_graphics_boot`, the stale-`gc_acquired`
+   acquire) was suppressed. 0986 makes `vcattach` allocate the buffer once
+   the VM is up and replay the messages printed so far, restoring the stock
+   scroll path. Built into `boot-32-ipados-local.img`; visual check pending
+   on the next boot.

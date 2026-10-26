@@ -390,10 +390,43 @@ Findings and fixes:
   partition of each disk image as a window, and flashed with
   `fastboot flash userdata` (8.74 GiB).
 
-Current blocker: APFS `open` of the root volume fails with ENOENT before any
-block I/O. The container is exposed correctly (NXSB, nx_block_count matches the
-window exactly, and the ADT root-matching UUID is present in the volume
-superblock), so the failure is in APFS's root-vnode selection for the sealed
-system volume, not in the block device. The r15 chain avoided this by mounting
-an HFS+ root; a matching iPadOS 17 HFS+ root image (or the sealed-root snapshot
-metadata from iBoot) is the next step.
+## 2026-10-26: rootfs per the userdata docs; console scroll fixed
+
+- **The userdata rootfs was rebuilt to the documented layout.** The UniXNU
+  docs (unixnu.com/zh/guide/userdata, mirrored in `unixnu/docs/zh/`) define
+  the userdata image as the UNCHANGED whole `OS` and `Cryptex1,SystemOS` disk
+  images behind the SHNGROOT manifest; the previous image stripped each disk
+  image to its Apple APFS partition. New builder
+  `scripts/build-userdata-root.py` (Linux: `scripts/local-linux/udif.py`
+  decodes the DMGs; the upstream `unixnu/scripts/unixnu/ipsw.py` Ipsw helper
+  resolves Restore-manifest members and checks board.toml `[ipsw.sha256]`
+  pins; refuses images over the 21.76 GiB partition; writes the documented
+  `userdata-root.json`). The superseded `build-userdata-shngroot.py` was
+  removed. Image: `out/guacamole/userdata/userdata-root.img`, 8.74 GiB —
+  manifest@0, OS window (6,077,580,800 B, own GPT) @0x100000, SystemOS
+  (3,303,014,400 B) @0x16a600000. The APFS partition bytes are byte-identical
+  to the slice already flashed (verified), so the volume UUID
+  (`04769D26-...`) and root-matching are unchanged. No kernel change is
+  needed: the prelinked `IOGUIDPartitionScheme` (`IOPropertyMatch
+  {"Whole"=true}`, probe 0xfa0, verified in the kernelcache `__PRELINK_INFO`)
+  cuts the APFS partition out of the window, and apfs mounts the same
+  container bytes as the verified live-root boot. `rd=` must stay absent.
+- **Console scrolling fixed** (`patches/xnu/0986-ipados-vcattach-text-screen.patch`).
+  Root cause: the only `gc_enable(TRUE)` ran before the VM was initialized
+  (`kPETextScreen` in `arm_init`), so the paint-buffer allocation was skipped
+  (`vm_initialized==FALSE` guard in `gc_enable`); post-VM, `vcattach` skips
+  the Release/Acquire because `gc_graphics_boot` is TRUE and the standalone
+  acquire at `startup.c` is suppressed by the stale `gc_acquired` — so
+  `gc_buffer_size` stayed 0 forever and `gc_scroll_up`/`gc_clear_screen`
+  returned early. 0986 lets `vcattach` run the enable once the VM is up
+  (buffer allocated, stock buffer-repaint scroll works) and replays
+  `msgbufp` so the early log is visible. Kernel rebuilt;
+  `boot-32-ipados-local.img` (72,343,552 bytes, built 08:00) carries it.
+- The full build pipeline (`./scripts/build-local-linux.sh`) runs green with
+  both changes (kernel + prelink + payload + image). Remaining hardware
+  steps: `fastboot flash userdata` with the new image, then
+  `fastboot boot out/guacamole/boot/boot-32-ipados-local.img` — that boot
+  answers the pending `IOSleep(100)` slot-1 question and shows the scrolling
+  console. The docs' Data-volume seed (`--data-ramdisk` +
+  `scripts/seed-data-grow.py`) still needs macOS `hdiutil`/`diskutil` and is
+  not wired yet.

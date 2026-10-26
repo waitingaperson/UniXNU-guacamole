@@ -1484,6 +1484,30 @@ extern "C" int native_ufs_block_authenticates (IOService *provider, const char *
 }
 
 
+// Diagnostic only: list the IOKit media identities seen by the boot flow.
+extern "C" void
+guac_dump_media (void)
+{
+  OSDictionary *matching = IOService::serviceMatching ("IOMedia");
+  OSIterator *iterator = matching ? IOService::getMatchingServices (matching) : nullptr;
+  unsigned count = 0;
+  while (iterator && (count < 12) && (count++ < 12)) {
+    OSObject *object = iterator->getNextObject ();
+    if (!object) break;
+    IOService *service = OSDynamicCast (IOService, object);
+    if (!service) continue;
+    OSString *uuid = OSDynamicCast (OSString, service->getProperty ("UUID"));
+    OSString *name = OSDynamicCast (OSString, service->getProperty ("BSD Name"));
+    OSNumber *size = OSDynamicCast (OSNumber, service->getProperty ("Size"));
+    printf ("GUAC-MEDIA: %s uuid %.36s bytes=%llu\n",
+        name ? name->getCStringNoCopy () : "-",
+        uuid ? uuid->getCStringNoCopy () : "-",
+        size ? (unsigned long long)size->unsigned64BitValue () : 0ULL);
+  }
+  OSSafeReleaseNULL (iterator);
+  OSSafeReleaseNULL (matching);
+}
+
 // Strong definition used by the pre-exec cryptex hook (the kernel C side keeps a
 // weak fallback for the bootstrap pass). Polls because the APFS attach of the
 // window volumes is asynchronous relative to the first exec.

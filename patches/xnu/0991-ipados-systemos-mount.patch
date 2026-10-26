@@ -1,0 +1,21 @@
+diff --git a/bsd/kern/kern_exec.c b/bsd/kern/kern_exec.c
+index 3ff2c18..c9679c0 100644
+--- a/bsd/kern/kern_exec.c
++++ b/bsd/kern/kern_exec.c
+@@ -7999,6 +7999,16 @@ static const char * init_programs[] = {
+  * layout sheng qualified against this APFS; anonymous_owner 99 is the bring-up
+  * credential and the mount is verified by the fstype/read-only result.
+  */
++/* Bootstrap pass fallback; the GuacUfsMedia archive provides the strong one. */
++__attribute__((weak)) int
++guac_media_find_volume(const char *uuid, char *path, unsigned long size)
++{
++	(void)uuid;
++	(void)path;
++	(void)size;
++	return 0;
++}
++
+ extern int guac_media_find_volume(const char *uuid, char *path, unsigned long size);
+ 
+ static int

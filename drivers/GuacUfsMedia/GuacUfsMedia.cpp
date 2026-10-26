@@ -42,10 +42,13 @@ guac_media_rootdev(const char *name, uint32_t *dev)
 }
 extern "C" uint64_t sweet_ufs_media_bytes(void);
 extern "C" uint32_t sweet_ufs_media_block_size(void);
+extern "C" uint64_t sweet_ufs_window_bytes(unsigned int win);
+extern "C" int sweet_ufs_window_read(unsigned int win, uint64_t off, void *dst, uint64_t len);
 
 class GuacUfsMedia : public IOBlockStorageDevice {
 	OSDeclareDefaultStructors(GuacUfsMedia)
 public:
+	unsigned int window = 0;
 	bool start(IOService *provider) override;
 	IOReturn doAsyncReadWrite(IOMemoryDescriptor *buffer, UInt64 block,
 	    UInt64 count, IOStorageAttributes *attributes,
@@ -81,7 +84,7 @@ IOReturn
 GuacUfsMedia::doAsyncReadWrite(IOMemoryDescriptor *buffer, UInt64 block,
     UInt64 count, IOStorageAttributes *, IOStorageCompletion *completion)
 {
-	uint64_t bytes = sweet_ufs_media_bytes();
+	uint64_t bytes = window ? sweet_ufs_window_bytes(window) : sweet_ufs_media_bytes();
 	uint64_t bsize = sweet_ufs_media_block_size();
 	uint64_t off = block * 512;
 	uint64_t len = count * 512;
@@ -109,7 +112,8 @@ GuacUfsMedia::doAsyncReadWrite(IOMemoryDescriptor *buffer, UInt64 block,
 	uint64_t done = 0;
 	while (done < len) {
 		uint64_t want = (len - done) < chunk ? (len - done) : chunk;
-		int error = sweet_ufs_media_read(off + done, bounce, want);
+		int error = window ? sweet_ufs_window_read(window, off + done, bounce, want)
+		    : sweet_ufs_media_read(off + done, bounce, want);
 		if (error != 0) {
 			result = kIOReturnIOError;
 			break;
@@ -158,7 +162,8 @@ GuacUfsMedia::reportEjectability(bool *isEjectable)
 IOReturn
 GuacUfsMedia::reportMaxValidBlock(UInt64 *maxBlock)
 {
-	*maxBlock = sweet_ufs_media_bytes() / 512 - 1;
+	uint64_t bytes = window ? sweet_ufs_window_bytes(window) : sweet_ufs_media_bytes();
+	*maxBlock = bytes / 512 - 1;
 	return kIOReturnSuccess;
 }
 
@@ -260,6 +265,20 @@ guac_ufs_media_publish(void)
 	media->registerService(kIOServiceSynchronous);
 	guac_media_stage = 6;
 	printf("GUACMEDIA: registered\n");
+	if (sweet_ufs_window_bytes(1) != 0) {
+		GuacUfsMedia *extra = new GuacUfsMedia;
+		if (extra != nullptr) {
+			extra->window = 1;
+			if (extra->init(nullptr) && extra->attach(provider)) {
+				extra->registerService(kIOServiceSynchronous);
+				printf("GUACMEDIA: window 1 media published (%llu bytes)\n",
+				    (unsigned long long)sweet_ufs_window_bytes(1));
+			} else {
+				extra->release();
+				printf("GUACMEDIA: window 1 media failed\n");
+			}
+		}
+	}
 	{
 		/*
 		 * The kernel console overwrites its last row, so park the answer in
@@ -315,4 +334,60 @@ guac_ufs_media_publish(void)
 		}
 	}
 	return 0;
+}
+
+/*
+ * Find a published IOMedia by UUID (the SystemOS cryptex volume) and return
+ * its /dev path. Bring-up instrument: unlike native_verified_block_volume_device
+ * it does not require the owner trust policy.
+ */
+extern "C" int
+guac_media_find_volume(const char *uuid, char *path, unsigned long size)
+{
+	OSDictionary *matching;
+	OSDictionary *properties;
+	OSString *wanted;
+	OSIterator *iterator;
+	int found = 0;
+
+	if (uuid == nullptr || path == nullptr || size < 6 || strlen(uuid) != 36) {
+		return 0;
+	}
+	path[0] = 0;
+	matching = IOService::serviceMatching("IOMedia");
+	properties = OSDictionary::withCapacity(1);
+	wanted = OSString::withCString(uuid);
+	if (matching == nullptr || properties == nullptr || wanted == nullptr ||
+	    !properties->setObject("UUID", wanted) || !matching->setObject("IOPropertyMatch", properties)) {
+		OSSafeReleaseNULL(wanted);
+		OSSafeReleaseNULL(properties);
+		OSSafeReleaseNULL(matching);
+		return 0;
+	}
+	OSSafeReleaseNULL(wanted);
+	OSSafeReleaseNULL(properties);
+	iterator = IOService::getMatchingServices(matching);
+	OSSafeReleaseNULL(matching);
+	if (iterator == nullptr) {
+		return 0;
+	}
+	while (OSObject *object = iterator->getNextObject()) {
+		IOService *service = OSDynamicCast(IOService, object);
+		OSString *identity;
+		OSString *name;
+		if (service == nullptr) {
+			continue;
+		}
+		identity = OSDynamicCast(OSString, service->getProperty("UUID"));
+		name = OSDynamicCast(OSString, service->getProperty("BSD Name"));
+		if (identity == nullptr || strcmp(identity->getCStringNoCopy(), uuid) != 0 ||
+		    name == nullptr || name->getLength() == 0 ||
+		    name->getLength() >= size - 6) {
+			continue;
+		}
+		snprintf(path, size, "/dev/%s", name->getCStringNoCopy());
+		found = 1;
+	}
+	iterator->release();
+	return found;
 }

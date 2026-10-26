@@ -1,9 +1,9 @@
 diff --git a/.guacamole-applied b/.guacamole-applied
 new file mode 100644
-index 0000000..26f1274
+index 0000000..8489c1f
 --- /dev/null
 +++ b/.guacamole-applied
-@@ -0,0 +1,141 @@
+@@ -0,0 +1,143 @@
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0400-guacamole-ufs-root.patch 3b89686a58e3c73faa1144e3d5127ef47aeb15dd9018c3bd364aa0dd9a466db3
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0900-ipados-iorpc-kernel-declaration.patch 5d7c085fee35864280997b50552ed4d9c141bc41212d8c33146f6858930c218d
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0901-ipados-framebuffer-console.patch ebc54d1e2774f69f5e3fe6ce6e85a1f8f5ca8b7dec0879eeb4043d634131e2ad
@@ -144,7 +144,9 @@ index 0000000..26f1274
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0987-ipados-armcpu-slot.patch 3956b3f232c3aec2087ff319cefa568463d9b253688af359533e3e4fa48263a5
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0988-ipados-panic-backtrace.patch 0b731d4baa98eef49457be7d99c6f6d2844dd733bdc678401df95bedfbfeca0d
 +/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0989-ipados-ppl-preempt.patch 51d50d05aa978818879b8b3968188fae560e85010a0d21e2d00c71083afa1730
-+/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/zzz-current-state.patch 2322e493e6dac8daaa267167a4f9464efcabc7ab30d5a760d6dd25a07b6bcae2
++/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0989-ipados-ppl-preempt.patch bfc4f596febaf74c175a4380f5c6414f93da36ff14d486a2cbecaa20b0af6950
++/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/0990-ipados-diagnostics-strip.patch 7cd8bd26196fb289e9d225f4edeae6628ad4c6ebc9a7965d760a8e6aa63bd10f
++/home/invalidname/UniXNU-guacamole/out/guacamole/tree/patches/xnu/zzz-current-state.patch 8486a772841cdc5b360fe0c2e262266d0fa52a4cd000292ad03578549dc004c6
 diff --git a/EXTERNAL_HEADERS/CoreEntitlements/CoreEntitlements.h b/EXTERNAL_HEADERS/CoreEntitlements/CoreEntitlements.h
 index 60e7e8f..5831a6c 100644
 --- a/EXTERNAL_HEADERS/CoreEntitlements/CoreEntitlements.h
@@ -1378,10 +1380,10 @@ index 19b4065..2a3b640 100644
  bsd/dev/unix_startup.c			standard
 diff --git a/bsd/dev/sweet_ufs.c b/bsd/dev/sweet_ufs.c
 new file mode 100644
-index 0000000..844f334
+index 0000000..9df74f3
 --- /dev/null
 +++ b/bsd/dev/sweet_ufs.c
-@@ -0,0 +1,1195 @@
+@@ -0,0 +1,1269 @@
 +/*
 + * SWEET internal UFS root device.
 + *
@@ -1495,6 +1497,18 @@ index 0000000..844f334
 +	bool dma_uncached;                      /* device-mapped window: no cache ops */
 +	bool ready;
 +} su;
++
++/*
++ * All SHNGROOT windows in manifest order (window 0 is the root). GuacUfsMedia
++ * exposes windows 1.. as their own IOBlockStorageDevices; the SystemOS cryptex
++ * is window 1.
++ */
++static struct {
++	uint64_t offset;
++	uint64_t size;
++} su_windows[4];
++static uint32_t su_window_count;
++static uint64_t su_part_first;
 +
 +static LCK_GRP_DECLARE(sweet_ufs_grp, "sweet_ufs");
 +static LCK_MTX_DECLARE(sweet_ufs_lock, &sweet_ufs_grp);
@@ -2018,6 +2032,58 @@ index 0000000..844f334
 +	return error;
 +}
 +
++/*
++ * Additional SHNGROOT windows: the same bounce-buffer read, addressed from the
++ * window's own base inside the userdata partition.
++ */
++uint64_t
++sweet_ufs_window_bytes(unsigned int win)
++{
++	if (win == 0) {
++		return sweet_ufs_media_bytes();
++	}
++	if (win >= su_window_count) {
++		return 0;
++	}
++	return su_windows[win].size;
++}
++
++int
++sweet_ufs_window_read(unsigned int win, uint64_t off, void *dst, uint64_t len)
++{
++	uint8_t *out = (uint8_t *)dst;
++	uint64_t base, part;
++	int error = 0;
++
++	if (win == 0) {
++		return sweet_ufs_media_read(off, dst, len);
++	}
++	if (win >= su_window_count) {
++		return EINVAL;
++	}
++	part = su_windows[win].size;
++	if (off > part || len > part - off) {
++		return EINVAL;
++	}
++	base = su_part_first + su_windows[win].offset / UFS_BLOCK;
++	lck_mtx_lock(&sweet_ufs_lock);
++	for (uint64_t done = 0; done < len; ) {
++		uint64_t pos = off + done;
++		uint64_t lba = pos / UFS_BLOCK;
++		uint32_t skip = (uint32_t)(pos % UFS_BLOCK);
++		uint32_t want = MIN((uint32_t)(len - done), (uint32_t)(BOUNCE_SIZE - skip));
++		uint32_t blocks = (skip + want + UFS_BLOCK - 1) / UFS_BLOCK;
++		error = ufs_read_blocks(base + lba, blocks);
++		if (error != 0) {
++			break;
++		}
++		dma_copy_from(DMA_BOUNCE + skip, out + done, want);
++		done += want;
++	}
++	lck_mtx_unlock(&sweet_ufs_lock);
++	return error;
++}
++
 +static int
 +sweet_ufs_ioctl(__unused dev_t dev, u_long cmd, caddr_t data, __unused int flag,
 +    __unused struct proc *p, int is_char)
@@ -2229,21 +2295,31 @@ index 0000000..844f334
 +		    version, count);
 +		return EINVAL;
 +	}
-+	dma_copy_from(DMA_BOUNCE + 24, name, 32);
-+	name[32] = 0;
-+	dma_copy_from(DMA_BOUNCE + 24 + 32, &offset, sizeof(offset));
-+	dma_copy_from(DMA_BOUNCE + 24 + 40, &size, sizeof(size));
-+	if (size == 0 || offset >= image_bytes || (offset % UFS_BLOCK) != 0 ||
-+	    offset + size > (uint64_t)su.nblocks * UFS_BLOCK) {
-+		printf("SWEET UFS: SHNGROOT window \"%s\" outside the partition\n", name);
-+		return EINVAL;
++	su_part_first = su.first_block;
++	su_window_count = count;
++	for (uint32_t index = 0; index < count; index++) {
++		uint32_t at = 24 + 128 * index;
++		if (at + 128 > UFS_BLOCK) {
++			return EINVAL;
++		}
++		dma_copy_from(DMA_BOUNCE + at, name, 32);
++		name[32] = 0;
++		dma_copy_from(DMA_BOUNCE + at + 32, &offset, sizeof(offset));
++		dma_copy_from(DMA_BOUNCE + at + 40, &size, sizeof(size));
++		if (size == 0 || offset >= image_bytes || (offset % UFS_BLOCK) != 0 ||
++		    offset + size > (uint64_t)su.nblocks * UFS_BLOCK) {
++			printf("SWEET UFS: SHNGROOT window \"%s\" outside the partition\n", name);
++			return EINVAL;
++		}
++		su_windows[index].offset = offset;
++		su_windows[index].size = size;
++		printf("SWEET UFS: SHNGROOT \"%s\" offset %llu size %llu of %llu\n",
++		    name, (unsigned long long)offset, (unsigned long long)size,
++		    (unsigned long long)image_bytes);
 +	}
-+	printf("SWEET UFS: SHNGROOT \"%s\" offset %llu size %llu of %llu\n",
-+	    name, (unsigned long long)offset, (unsigned long long)size,
-+	    (unsigned long long)image_bytes);
-+	su.first_block += offset / UFS_BLOCK;
-+	su.root_bytes = size;
-+	su.nblocks = (size + UFS_BLOCK - 1) / UFS_BLOCK;
++	su.first_block += su_windows[0].offset / UFS_BLOCK;
++	su.root_bytes = su_windows[0].size;
++	su.nblocks = (su_windows[0].size + UFS_BLOCK - 1) / UFS_BLOCK;
 +	return 0;
 +}
 +
@@ -3104,7 +3180,7 @@ index bb558ee..246c92e 100644
 +
 +void native_legacy_display_probe(void) { }
 diff --git a/bsd/kern/kern_exec.c b/bsd/kern/kern_exec.c
-index 8bba078..9b4c502 100644
+index 8bba078..c9679c0 100644
 --- a/bsd/kern/kern_exec.c
 +++ b/bsd/kern/kern_exec.c
 @@ -1,3 +1,4 @@
@@ -3417,7 +3493,8 @@ index 8bba078..9b4c502 100644
 +	memcpy(&bytes, block, sizeof(bytes));
 +	kfree_data(block, bytes);
 +}
-+static int
+ static int
+-load_init_program_at_path(proc_t p, user_addr_t scratch_addr, const char* path)
 +native_gpu_addon_inflate(const uint8_t *packed, uint64_t packed_size, uint8_t *data, uint64_t size)
 +{
 +	z_stream stream;
@@ -3440,8 +3517,7 @@ index 8bba078..9b4c502 100644
 +volatile int native_gpu_addon_same = 0;
 +volatile int native_gpu_addon_failed = 0;
 +volatile int native_gpu_addon_error = 0;
- static int
--load_init_program_at_path(proc_t p, user_addr_t scratch_addr, const char* path)
++static int
 +native_gpu_addon_equal(vnode_t vp, const uint8_t *data, uint64_t size, uint32_t mode, vfs_context_t ctx)
 +{
 +	struct vnode_attr va;
@@ -4034,7 +4110,84 @@ index 8bba078..9b4c502 100644
  
  	/*
  	 * So that init task is set with uid,gid 0 token
-@@ -7141,6 +8021,7 @@ static const char * init_programs[] = {
+@@ -7109,6 +7989,76 @@ static const char * init_programs[] = {
+ 	"/sbin/launchd",
+ };
+ 
++#if defined(XNU_GUAC_SYSTEMOS_MOUNT) && XNU_GUAC_SYSTEMOS_MOUNT
++/*
++ * Bring-up SystemOS cryptex mount. The IPSW keeps the dyld shared cache in the
++ * SystemOS APFS volume (UUID 8846FE78-2910-4297-AF97-D59BB6F8FC16), so launchd
++ * cannot map the cache while only the live OS root is mounted. Before the first
++ * exec, mount that volume read-only at /System/Cryptexes/OS (one of the kernel's
++ * dyld cache search paths) and point dyld at it. The mount payload is the exact
++ * layout sheng qualified against this APFS; anonymous_owner 99 is the bring-up
++ * credential and the mount is verified by the fstype/read-only result.
++ */
++/* Bootstrap pass fallback; the GuacUfsMedia archive provides the strong one. */
++__attribute__((weak)) int
++guac_media_find_volume(const char *uuid, char *path, unsigned long size)
++{
++	(void)uuid;
++	(void)path;
++	(void)size;
++	return 0;
++}
++
++extern int guac_media_find_volume(const char *uuid, char *path, unsigned long size);
++
++static int
++guac_systemos_prepare(proc_t p, user_addr_t scratch, user_addr_t *envp)
++{
++	static const char cache_uuid[] = "8846FE78-2910-4297-AF97-D59BB6F8FC16";
++	static const char mountpoint[] = "/System/Cryptexes/OS";
++	static const char cache_env[] =
++	    "DYLD_SHARED_CACHE_DIR=/System/Cryptexes/OS/System/Library/Caches/com.apple.dyld";
++	static const char lib_env[] = "DYLD_FALLBACK_LIBRARY_PATH=/System/Cryptexes/OS/usr/lib";
++	char device_path[64] = {0};
++	uint8_t mount_data[0x150] = {0};
++	uint64_t mount_flags = MNT_RDONLY;
++	uint16_t mount_mode = 1;
++	uint32_t anonymous_owner = 99;
++	user64_addr_t spec = scratch + 0x160;
++	user64_addr_t environment[3] = {scratch + 0x400, scratch + 0x600, USER_ADDR_NULL};
++	struct mount_args request = {.type = scratch + 0x100, .path = scratch + 0x120,
++	    .flags = MNT_RDONLY, .data = scratch + 0x200};
++	int32_t result = 0;
++	int error;
++
++	if (!guac_media_find_volume(cache_uuid, device_path, sizeof(device_path))) {
++		return ENOENT;
++	}
++	memcpy(mount_data, &spec, sizeof(spec));
++	memcpy(mount_data + 8, &mount_flags, sizeof(mount_flags));
++	memcpy(mount_data + 16, &mount_mode, sizeof(mount_mode));
++	memcpy(mount_data + 0x144, &anonymous_owner, sizeof(anonymous_owner));
++	memcpy(mount_data + 0x148, &anonymous_owner, sizeof(anonymous_owner));
++	if ((error = copyout("apfs", request.type, 5)) != 0 ||
++	    (error = copyout(mountpoint, request.path, sizeof(mountpoint))) != 0 ||
++	    (error = copyout(device_path, spec, strlen(device_path) + 1)) != 0 ||
++	    (error = copyout(mount_data, request.data, sizeof(mount_data))) != 0) {
++		return error;
++	}
++	error = mount(p, &request, &result);
++	if (error) {
++		return error;
++	}
++	if ((error = copyout(cache_env, environment[0], sizeof(cache_env))) != 0 ||
++	    (error = copyout(lib_env, environment[1], sizeof(lib_env))) != 0 ||
++	    (error = copyout(environment, scratch + 0x500, sizeof(environment))) != 0) {
++		return error;
++	}
++	*envp = scratch + 0x500;
++	return 0;
++}
++#endif /* XNU_GUAC_SYSTEMOS_MOUNT */
++
+ /*
+  * load_init_program
+  *
+@@ -7141,6 +8091,7 @@ static const char * init_programs[] = {
  void
  load_init_program(proc_t p)
  {
@@ -4042,11 +4195,18 @@ index 8bba078..9b4c502 100644
  	uint32_t i;
  	int error;
  	vm_map_t map = current_map();
-@@ -7148,10 +8029,41 @@ load_init_program(proc_t p)
+@@ -7148,10 +8099,48 @@ load_init_program(proc_t p)
  	mach_vm_size_t map_page_size = vm_map_page_size(map);
  
  	(void) mach_vm_allocate_kernel(map, &scratch_addr, map_page_size, VM_FLAGS_ANYWHERE, VM_KERN_MEMORY_NONE);
 +	user_addr_t init_envp = USER_ADDR_NULL;
++#if defined(XNU_GUAC_SYSTEMOS_MOUNT) && XNU_GUAC_SYSTEMOS_MOUNT
++	{
++		int cache_error = guac_systemos_prepare(p, (user_addr_t)scratch_addr, &init_envp);
++		printf("GUAC: SystemOS cryptex mount %s (%d)\n",
++		    cache_error ? "failed" : "ok", cache_error);
++	}
++#endif
 +#if defined(XNU_OWNER_CACHE_MOUNT) && XNU_OWNER_CACHE_MOUNT
 +	boot_progress_stage("SystemOS mount enter");
 +	int cache_error = native_owner_cache_prepare(p, (user_addr_t)scratch_addr, &init_envp);
@@ -4084,7 +4244,7 @@ index 8bba078..9b4c502 100644
  #if DEBUG || DEVELOPMENT
  	/* Check for boot-arg suffix first */
  	char launchd_suffix[64];
-@@ -7162,7 +8074,7 @@ load_init_program(proc_t p)
+@@ -7162,7 +8151,7 @@ load_init_program(proc_t p)
  
  		if (is_release_suffix) {
  			printf("load_init_program: attempting to load /sbin/launchd\n");
@@ -4093,7 +4253,7 @@ index 8bba078..9b4c502 100644
  			if (!error) {
  				return;
  			}
-@@ -7173,7 +8085,7 @@ load_init_program(proc_t p)
+@@ -7173,7 +8162,7 @@ load_init_program(proc_t p)
  			strlcat(launchd_path, launchd_suffix, sizeof(launchd_path));
  
  			printf("load_init_program: attempting to load %s\n", launchd_path);
@@ -4102,7 +4262,7 @@ index 8bba078..9b4c502 100644
  			if (!error) {
  				return;
  			} else if (error != ENOENT) {
-@@ -7184,16 +8096,20 @@ load_init_program(proc_t p)
+@@ -7184,16 +8173,20 @@ load_init_program(proc_t p)
  #endif
  
  	error = ENOENT;
@@ -4124,7 +4284,7 @@ index 8bba078..9b4c502 100644
  	panic("Process 1 exec of %s failed, errno %d", ((i == 0) ? "<null>" : init_programs[i - 1]), error);
  }
  
-@@ -7632,6 +8548,7 @@ process_signature(proc_t p, struct image_params *imgp)
+@@ -7632,6 +8625,7 @@ process_signature(proc_t p, struct image_params *imgp)
  	 * approve of exec, kill and return immediately.
  	 */
  	if (imgp->ip_mac_return != 0) {
@@ -4132,7 +4292,7 @@ index 8bba078..9b4c502 100644
  		KERNEL_DEBUG_CONSTANT(BSDDBG_CODE(DBG_BSD_PROC, BSD_PROC_EXITREASON_CREATE) | DBG_FUNC_NONE,
  		    proc_getpid(p), OS_REASON_EXEC, EXEC_EXIT_REASON_SECURITY_POLICY, 0, 0);
  		signature_failure_reason = os_reason_create(OS_REASON_EXEC, EXEC_EXIT_REASON_SECURITY_POLICY);
-@@ -7794,7 +8711,9 @@ done:
+@@ -7794,7 +8788,9 @@ done:
  		 * state.
  		 */
  

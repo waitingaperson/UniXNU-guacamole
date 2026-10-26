@@ -63,8 +63,11 @@ fetch = ["KernelCache", "DeviceTree", "StaticTrustCache", "Cryptex1,SystemTrustC
 
 [userdata]
 # The phone's "userdata" GPT partition (observed: first block 0x1b188, 22278 MiB,
-# 4 KiB sectors). The SHNGROOT image is flashed here; the kernel's UFS driver
-# exposes the first window (OS) as the root block device.
+# 4 KiB sectors). The SHNGROOT image is flashed here: the unchanged OS and
+# SystemOS disk images of the IPSW (whole disk images, GPT included, per
+# docs/zh/guide/userdata) behind a manifest; the kernel's UFS driver exposes the
+# first window (OS) as the root block device and the partition scheme publishes
+# the APFS partition inside it.
 first_lba = 0x1b188
 last_lba = 0x58b787
 lba_bytes = 4096

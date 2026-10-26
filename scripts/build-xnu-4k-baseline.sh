@@ -806,7 +806,11 @@ PY_BINDINGS
     KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $MOCKFS_ARCHIVE"
   fi
   if [ "$SHENG_PMGR" = 1 ]; then
-    PMGR_ARCHIVE=$ROOT/build/sheng-platform-power/libShengPlatformPower.a
+    # AMFI's ConfigurationSettings needs an ApplePMGRNub service; the component
+    # instantiates the real (prelinked) class with no provider, which the
+    # original readAon/writeAon helpers accept (provider NULL -> 0).
+    python3 scripts/build-arm-driver.py GuacPMGR
+    PMGR_ARCHIVE=$ROOT/build/guac-pmgr/libGuacPMGR.a
     test -f "$PMGR_ARCHIVE"
     KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES -Wl,-force_load,$PMGR_ARCHIVE"
     KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $PMGR_ARCHIVE"

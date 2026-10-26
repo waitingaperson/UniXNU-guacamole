@@ -687,6 +687,7 @@ if [ "${XNU_SOURCE_CORECRYPTO14:-0}" = 1 ] && [ "$BOOTSTRAP" = 0 ]; then
   KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES $ROOT/build/guac-ufs-media/native-storage-bindings.o -Wl,-force_load,$GUAC_UFS_MEDIA_ARCHIVE"
   KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $GUAC_UFS_MEDIA_ARCHIVE"
   if [ "${XNU_TEST_NATIVEUFS:-0}" = 1 ]; then
+    python3 scripts/build-arm-driver.py NativeUfs
     TEST_ARCHIVE=$ROOT/build/native-ufs/libNativeUfs.a
     test -f "$TEST_ARCHIVE"
     KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES -Wl,-force_load,$TEST_ARCHIVE"

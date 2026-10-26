@@ -1,7 +1,8 @@
 # iPadOS 17.7.11 / XNU 10063 bring-up state (guacamole)
 
-Last updated: 2026-10-26 (rootfs redone per the UniXNU userdata docs; console
-scroll fixed).
+Last updated: 2026-10-26 (docs-layout rootfs + console scroll verified on
+hardware; the `IOSleep(100)` experiment observed: the init thread still never
+runs — the timeout wake is the missing piece).
 
 ## What already works
 
@@ -81,8 +82,9 @@ are idempotent. This is a deliberate deviation from the official model.
 - The APFS kext bytes are patched after `emit_prelink.py`; if the target
   kernelcache changes, re-derive the vtable and the two code sites.
 - The text console scrolls since 0986 (`vcattach` allocates the paint buffer
-  once the VM is up and replays the early output); the kprintf log is now
-  readable across a full screen. The `sweet_stage_*` framebuffer fields are
+  once the VM is up and replays the early output) — verified on hardware
+  2026-10-26: one screen shows the whole boot log through the apfs mount. The
+  `sweet_stage_*` framebuffer fields are
   fixed position by design (they do not scroll), so keep using them for
   boot-stage markers and fault dumps:
   - `sweet_stage_slot(slot, value)` draws slot 0..3 at framebuffer rows
@@ -144,8 +146,18 @@ disk image down to its Apple APFS partition.
   `scripts/seed-data-grow.py`) still needs macOS `hdiutil`/`diskutil` and is
   not wired yet; the current boot does not reach it (process 1 never runs).
 
-The phone still runs the old slice image; `fastboot flash userdata
-out/guacamole/userdata/userdata-root.img` is required before the next boot.
+The phone runs this image since 2026-10-26 (`fastboot flash userdata` of the
+9,382,658,048-byte image; the old slice image remains as
+`out/guacamole/userdata/userdata-shngroot.img`). The boot log verified the
+full docs chain on hardware: `SWEET UFS: "userdata" on LUN 0` →
+`IOService:/GuacUfsMedia/IOBlockStorageDriver/UniXNU Guacamole UFS root
+Media/IOGUIDPartitionScheme/…/AppleFSContainer…/DarwinUpdate21H461_J120AP…` →
+`BSD root: disk1s1, major 1, minor 3` → `apfs_vfsop_mountroot:2955: mountroot
+called!` → container `xid 418` opened, checkpoint search, volume mount →
+`handle_mount:817: disk1s1 vol-uuid: 04769D26-2CA0-4825-B443-E2E5F88300F2 …
+block count: 1483776 (unencrypted; flags: 0x1)`. The volume UUID was also
+verified in the built image: the volume superblock (APSB, obj oid 0x402,
+xid 0x1a2) carries it raw at offset +0xd0.
 
 ## Useful commands
 
@@ -163,16 +175,20 @@ Boot args currently relevant: `root-live-fs=1`,
 
 ## Next steps
 
-0. Flash the docs-layout userdata (`fastboot flash userdata
-   out/guacamole/userdata/userdata-root.img`), then boot the current image:
-   one boot answers both the `IOSleep(100)` experiment (slot 1 fields) and
-   the scrolling console.
-1. Observe the `IOSleep(100)` experiment: does `bsdinit_task` (slot 1)
-   start? If yes, the yield was the gate; keep a sleep or a proper wakeup.
-2. If the init thread never runs, port the documented platform pieces
-   (`ArmDTPlatform`, `ArmCpu` timer/GIC/IPI, SMMU) from the reference
-   UniXNU-sheng sources instead of the older 8796-era patches, then retry
-   the clone.
+1. ~~Observe the `IOSleep(100)` experiment~~ Done 2026-10-26 (session log 7):
+   `bsdinit_task` (slot 1) still never starts. The boot thread parks in
+   `machine_switch_context` (via `fork_create_child+0x190` →
+   `delay_for_interval+0x8c` → `thread_block_reason+0x100` →
+   `thread_invoke+0x4ac`) and the 100 ms deadline wake never fires — for 38
+   minutes (`sweet_stage_heartbeat` 0x8e8 = 2280 beats at row 2900, and the
+   heartbeat thread itself runs). Cross-thread wakeups DO work (the IOKit
+   `Waiting on <IOPropertyMatch UUID…>` wait completed when the volume media
+   appeared); what is missing is the timer-interrupt/deadline wake. The
+   yield-vs-sleep distinction is moot.
+2. Port the documented platform pieces (ArmDTPlatform, ArmCpu timer/GIC/IPI,
+   SMMU) from the reference UniXNU-sheng sources instead of the older
+   8796-era patches — the timer interrupt/deadline wake is now the proven
+   blocker, and the init thread will need it too.
 3. Only after process 1 runs: OS services (SystemOS/Data mounts) and the
    display path (`GopFramebuffer` + `NativeLegacyDisplay`, Aloha GOP) per
    <https://unixnu.com/zh/porting/display>.
@@ -225,5 +241,24 @@ been re-applied somewhere.
    post-VM path (`vcattach` with `gc_graphics_boot`, the stale-`gc_acquired`
    acquire) was suppressed. 0986 makes `vcattach` allocate the buffer once
    the VM is up and replay the messages printed so far, restoring the stock
-   scroll path. Built into `boot-32-ipados-local.img`; visual check pending
-   on the next boot.
+   scroll path. Built into `boot-32-ipados-local.img`; verified on hardware
+   (entry 6).
+6. 2026-10-26, hardware boot of the docs-layout rootfs + 0986 (photo
+   IMG_20261026_114912): the whole-image chain verified end to end —
+   `IOGUIDPartitionScheme` cut the APFS partition out of the OS window
+   (`disk0s1`, block size 4096, block count 1,483,776 = the partition's exact
+   byte count), apfs opened the container (`xid 418` = 0x1a2, matching the
+   superblock bytes), the patched snapshot lookup returned ENOENT (2) and the
+   live root mounted; `BSD root: disk1s1, major 1, minor 3` with
+   `vol-uuid 04769D26-2CA0-4825-B443-E2E5F88300F2` (verified raw at APSB+0xd0
+   in the built image). The console scrolled: the entire boot log was on one
+   screen.
+7. 2026-10-26, `IOSleep(100)` experiment observed (same photo): stage slot 0
+   = 0x61 (97), slot 1 never drawn. The boot thread's parked stack (heartbeat
+   stack-walk rows 2400..2760) symbolicates as `fork_create_child+0x190` →
+   `delay_for_interval+0x8c` → `thread_block_reason+0x100` →
+   `thread_invoke+0x4ac` → `machine_switch_context`. The heartbeat at row
+   2900 read 0x8e8 = 2280 beats ≈ 38 minutes wedged while the heartbeat
+   thread itself kept running. Cross-thread wakeups work (the IOKit root wait
+   completed); the timer-interrupt/deadline wake does not — that is the
+   blocker to port.

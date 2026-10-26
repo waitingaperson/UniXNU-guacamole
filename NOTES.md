@@ -430,3 +430,18 @@ Findings and fixes:
   console. The docs' Data-volume seed (`--data-ramdisk` +
   `scripts/seed-data-grow.py`) still needs macOS `hdiutil`/`diskutil` and is
   not wired yet.
+- **Hardware verified (2026-10-26, both flashed).** The docs-layout rootfs
+  boots: `IOGUIDPartitionScheme` cut the APFS partition out of the OS window
+  (`disk0s1`, block count 1,483,776 × 4096 = the partition's exact size), the
+  container opened (`xid 418`), the patched snapshot lookup returned ENOENT
+  and the live root mounted; `BSD root: disk1s1 (1,3)` with the volume UUID
+  `04769D26-2CA0-4825-B443-E2E5F88300F2` (verified raw at APSB+0xd0 of the
+  built image; obj oid 0x402, xid 0x1a2). The console scrolled (0986 works).
+- **`IOSleep(100)` experiment answered: the init thread still never runs.**
+  Slot 1 empty; the boot thread parked 38 min (heartbeat 0x8e8 = 2280 beats)
+  with the stack `fork_create_child+0x190 → delay_for_interval+0x8c →
+  thread_block_reason+0x100 → thread_invoke+0x4ac → machine_switch_context`.
+  Cross-thread wakeups work (the IOKit root-matching wait completed); the
+  timer-interrupt/deadline wake does not. Next: port the platform timer/GIC/
+  IPI (ArmCpu/ArmDTPlatform, plus SMMU) from the reference UniXNU-sheng
+  sources, replacing the 8796-era patches, then retry the clone.

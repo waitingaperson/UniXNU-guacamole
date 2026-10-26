@@ -1,5 +1,27 @@
 # UniXNU-guacamole notes
 
+## Active status (2026-10-26, compacting session)
+- Verified on hardware: ShengUfs-only storage (no sweet_ufs/GuacUfsMedia),
+  owner-signed windows with per-read verification, owner root acceptance,
+  SystemOS cryptex union mount at /, dyld ignition flag (dyld=8), 4 KiB
+  signature hash cache (all GUAC-CS err=0), and the owner Data seed mounted
+  read-write at /private/var (RamBlock disk4, volume 82AB0DD5-…).
+- Remaining userland blocker: the dyld mapped shared cache. The kernel's shared
+  region/enter/map succeeds, the cache file is visible at
+  /System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64, and the
+  libsystem check_np still sees an empty region. Next diagnostic: the
+  vm_shared_region_map_file entry/kr trace (added, GUAC-SR lines) and the dyld
+  loadDyldCache path.
+- USB debug port: drivers/QcomXnuUsbDebug vendored with soc/Sm8150.h; the
+  archive builds against the 10063 record. Console/worker patches applied except
+  osfmk/kern/printf.c (consdebug_putc/consdebug_putc_unbuffered) and one
+  serial_console.c hunk, recorded as .rej in the work tree. Remaining: per-file
+  -DXNU_QCOM_USB_DEBUG=1, -I drivers/QcomXnuUsbDebug/include, -force_load the
+  archive, boot arg qcom-usb-debug=1, host collect-xnu-usb.py.
+- Repo commits: 2177a68; work tree: 95aa3e9. Data seed artifact: data-seed.dbr
+  (sha256 e6a1e62b…, volume 82AB0DD5-D334-46B7-A911-96E2FEF7FCCB).
+
+
 ## Active status (2026-10-22)
 
 - **Full chain verified on hardware (2026-10-22).** r15 boots through
